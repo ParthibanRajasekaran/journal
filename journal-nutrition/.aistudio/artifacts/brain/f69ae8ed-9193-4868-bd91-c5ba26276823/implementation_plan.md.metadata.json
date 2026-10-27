@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for caching all meal data locally using a WebAssembly SQLite engine backed by persistent storage, enabling offline logging with optimistic estimates and background AI enhancement when connectivity is restored.",
+  "updatedAt":  "2026-09-29T12:13:59.486961Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="mBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="50%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="mLeafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a7f3d0" />
+      <stop offset="50%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="mDropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bae6fd" />
+      <stop offset="50%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="mGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="mShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Full-bleed background for maskable safe-zone -->
+  <rect width="512" height="512" fill="url(#mBgGrad)" />
+
+  <!-- Safe Zone content: scaled down by 0.78 and centered at (256, 256) -->
+  <g transform="translate(56, 56) scale(0.78)">
+    <circle cx="256" cy="256" r="180" fill="none" stroke="url(#mGoldGrad)" stroke-width="4" stroke-dasharray="14 10" opacity="0.45" />
+
+    <g filter="url(#mShadow)">
+      <path d="M 180 340 C 180 200, 260 140, 360 120 C 360 220, 300 340, 180 340 Z" fill="url(#mLeafGrad)" />
+      <path d="M 190 330 Q 255 245 345 135" fill="none" stroke="#064e3b" stroke-width="7" stroke-linecap="round" opacity="0.6" />
+      <path d="M 210 200 C 210 170, 256 120, 256 120 C 256 120, 302 170, 302 200 C 302 225, 282 245, 256 245 C 230 245, 210 225, 210 200 Z" fill="url(#mDropGrad)" opacity="0.95" />
+      <ellipse cx="242" cy="185" rx="6" ry="12" transform="rotate(-25 242 185)" fill="#ffffff" opacity="0.75" />
+    </g>
+  </g>
+</svg>

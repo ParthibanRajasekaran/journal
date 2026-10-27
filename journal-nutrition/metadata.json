@@ -1,0 +1,11 @@
+{
+  "name": "Journal",
+  "description": "AI-powered mindful calorie and nutrition tracker with hybrid photo & voice logging, confidence metering, and proactive well-being coaching.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

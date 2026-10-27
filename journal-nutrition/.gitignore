@@ -1,0 +1,20 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Android build cache
+.gradle/
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# iOS build cache
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+*.bundle

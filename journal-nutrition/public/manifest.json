@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "Journal – Mindful AI Nutrition",
+  "short_name": "Journal",
+  "description": "AI-powered mindful calorie and nutrition tracker with hybrid photo & voice logging, offline SQLite storage, and smart hydration intelligence.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#064e3b",
+  "background_color": "#FBFBFA",
+  "categories": ["health", "lifestyle", "fitness"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

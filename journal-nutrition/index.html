@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      // 1. Mock Vite HMR WebSocket in sandboxed iframe environment
+      if (typeof window !== 'undefined' && window.WebSocket) {
+        const NativeWebSocket = window.WebSocket;
+
+        class MockHmrSocket extends EventTarget {
+          constructor(url) {
+            super();
+            this.url = String(url);
+            this.protocol = 'vite-hmr';
+            this.readyState = 1; // WebSocket.OPEN
+            this.onopen = null;
+            this.onclose = null;
+            this.onerror = null;
+            this.onmessage = null;
+
+            setTimeout(() => {
+              try {
+                const openEv = new Event('open');
+                this.dispatchEvent(openEv);
+                if (typeof this.onopen === 'function') {
+                  this.onopen(openEv);
+                }
+              } catch (e) {}
+            }, 10);
+          }
+
+          send() {}
+          close() {}
+        }
+
+        window.WebSocket = function (url, protocols) {
+          const isViteHmr =
+            protocols === 'vite-hmr' ||
+            (Array.isArray(protocols) && protocols.includes('vite-hmr')) ||
+            (typeof url === 'string' && (url.includes('/@vite') || url.includes('vite-hmr')));
+
+          if (isViteHmr) {
+            return new MockHmrSocket(url);
+          }
+
+          try {
+            return new NativeWebSocket(url, protocols);
+          } catch (e) {
+            return new NativeWebSocket(url);
+          }
+        };
+
+        window.WebSocket.prototype = NativeWebSocket.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+      }
+
+      // 2. Global window.onerror suppressor
+      const prevOnError = window.onerror;
+      window.onerror = function(message, source, lineno, colno, error) {
+        if (
+          (typeof message === 'string' && (message.includes('WebSocket') || message.includes('vite') || message.includes('ws://') || message.includes('wss://'))) ||
+          (error && error.message && error.message.includes('WebSocket'))
+        ) {
+          return true; // suppresses error in browser
+        }
+        if (typeof prevOnError === 'function') {
+          return prevOnError.apply(this, arguments);
+        }
+        return false;
+      };
+
+      // 3. Error event listener
+      window.addEventListener('error', function(e) {
+        if (
+          e &&
+          ((e.message && (e.message.includes('WebSocket') || e.message.includes('ws://') || e.message.includes('wss://'))) ||
+          (e.error && e.error.message && e.error.message.includes('WebSocket')))
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return true;
+        }
+      }, true);
+
+      // 4. Unhandled promise rejections
+      window.addEventListener('unhandledrejection', function(e) {
+        if (
+          e &&
+          e.reason &&
+          e.reason.message &&
+          (e.reason.message.includes('WebSocket') || e.reason.message.includes('ws://') || e.reason.message.includes('wss://'))
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Journal – Mindful AI Calorie & Nutrition Tracker</title>
+    <meta name="description" content="AI-powered mindful calorie and nutrition tracker with hybrid photo & voice logging, confidence metering, and proactive well-being coaching." />
+    <meta property="og:title" content="Journal – Mindful AI Calorie & Nutrition Tracker" />
+    <meta property="og:description" content="AI-powered mindful calorie and nutrition tracker with hybrid photo & voice logging, confidence metering, and proactive well-being coaching." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#064e3b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Journal" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#FBFBFA] text-[#1C1E1D] antialiased selection:bg-emerald-100 selection:text-emerald-900 min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
