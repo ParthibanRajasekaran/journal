@@ -8,7 +8,7 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 |---|---|---|---|---|
 | 0 | Clean up repo (move to root, README, .gitignore) | Done | Human | Pushed to origin/main (5 commits) |
 | 1 | PRD (`docs/prd.md`) | Draft v0.1 | Product | Defaults listed in PRD section 11 |
-| 1 | Architecture decisions (`docs/adr/0001` to `0006`) | Proposed | Architects | All six written; none accepted yet |
+| 1 | Architecture decisions (`docs/adr/0001` to `0007`) | Proposed; ADR-007 accepted | Architects | ADR-007 (Oracle Always Free hosting) accepted 2026-10-29 and supersedes ADR-002's hosting choice |
 | 1 | Design doc (`docs/design.md`) | Draft | Architecture | Describes components and flows |
 | 1 | OpenAPI spec (`docs/openapi.yaml`) | Draft | Backend | MVP surface; schema fields pending ADR-005 decision |
 | 1 | Observability plan (`docs/observability.md`) | Draft | Platform | OpenTelemetry conventions and redaction rules |
@@ -28,7 +28,7 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 2. **Estimate schema.** ADR-001 uses `calories` and numeric `confidence`. ADR-005 uses `calories_kcal` and `low|medium|high`. Neither has `is_food`. Pick one set and update both ADRs.
 3. **EU transfer basis and Article 9 status.** Counsel to confirm the transfer mechanism for US AI providers and whether meal and photo data is special-category health data.
 4. **Refresh-token lifetime (90 days) and re-auth window (5 min).** Proposed in ADR-004. Confirm.
-5. **Hosting target.** ADR-002 default is a single EU VPS. Confirm the Hetzner plan is in stock, or choose the Fly.io fallback.
+5. **Hosting target.** Decided: Oracle Always Free (ADR-007). Still to confirm: Oracle account, EU region, and instance shape in the console.
 6. **Client approach.** Capacitor hybrid (ADR-003) versus native. See `docs/client-architecture.md`.
 
 ## Verification still needed
