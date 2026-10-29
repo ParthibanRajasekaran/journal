@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     problem_type_base: str = "https://journal.example/problems/"
     # Local development default. Production must set JOURNAL_DATABASE_URL explicitly.
     database_url: str = "postgresql+asyncpg://127.0.0.1:5433/journal_dev"
+    # Public OAuth client identifier. The client secret is never stored in settings defaults.
+    google_client_id: str | None = None
 
 
 @lru_cache
