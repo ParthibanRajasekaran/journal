@@ -173,6 +173,7 @@ def test_successful_sign_in_sets_http_only_cookies_and_creates_the_user(
     assert "journal_access=" in set_cookie
     assert "journal_refresh=" in set_cookie
     assert set_cookie.count("httponly") >= 2
+    assert "samesite=lax" in set_cookie
     assert "samesite=strict" in set_cookie
     assert "path=/api/v1/auth" in set_cookie
 

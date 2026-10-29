@@ -125,6 +125,6 @@ Read 2026-10-29 unless noted.
 The web flow is implemented as the backend-confidential design described above:
 
 - `GET /api/v1/auth/google/start` sets a signed, 10-minute state cookie (state, nonce, PKCE verifier) and redirects to Google.
-- `GET /api/v1/auth/google/callback` checks state, exchanges the code with the client secret, verifies the ID token (RS256 only, issuer, audience, expiry with 60 s leeway, nonce, verified email), creates the account on first sign-in, and sets two HttpOnly cookies: `journal_access` (15 minutes, path `/`) and `journal_refresh` (30 days, path `/api/v1/auth`), both SameSite=Strict.
+- `GET /api/v1/auth/google/callback` checks state, exchanges the code with the client secret, verifies the ID token (RS256 only, issuer, audience, expiry with 60 s leeway, nonce, verified email), creates the account on first sign-in, and sets two HttpOnly cookies: `journal_access` (15 minutes, path `/`, SameSite=Lax so the cookie survives the redirect back from Google) and `journal_refresh` (30 days, path `/api/v1/auth`, SameSite=Strict). State-changing routes also require the CSRF header.
 - `POST /api/v1/auth/refresh` and `POST /api/v1/auth/logout` require the `X-Journal-Request: 1` header. Refresh tokens are opaque, stored only as SHA-256 hashes, rotated on every use, and reuse revokes the whole family.
 - Native clients are not implemented yet and will use a separate public-client flow.

@@ -41,7 +41,10 @@ def _set_session_cookies(response: Response, request: Request, access: str, refr
         max_age=settings.access_token_ttl_seconds,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # Lax, not Strict: the browser arrives here from Google (a cross-site redirect),
+        # and Strict would withhold the cookie on the very next request. Lax still blocks
+        # cross-site form posts, and state-changing routes also require the CSRF header.
+        samesite="lax",
         path="/",
     )
     response.set_cookie(
