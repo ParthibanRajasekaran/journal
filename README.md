@@ -1,35 +1,118 @@
-# NovaCoach
+# Journal - Nutrition Tracking App
 
-NovaCoach is a privacy-first OKR and well-being companion app for iOS 17+ built with SwiftUI, MVVM, and Clean Architecture. The app keeps all data on-device with encrypted Core Data storage, integrates Google and Apple authentication (stubs for signing), offers a local wake-word assistant, and provides dedicated experiences for OKRs, 10:10s, personal reflections, and analytics.
+A cross-platform nutrition tracking application built with React, TypeScript, and Capacitor. Track meals, monitor micronutrients, and achieve your health goals with an intelligent coaching system.
 
 ## Features
-- **OKR Dashboard** – define objectives and key results, visualise progress with glassmorphic cards, and link related action items.
-- **10:10s** – capture one-on-one meetings with notes, optional recordings, automatic transcript storage, and reminder scheduling for assigned action items.
-- **Personal Journal** – record daily focus plans, reflections, and mood with configurable notification cadences.
-- **Analytics** – review on-device analytics including completion stats, action item distribution, and reflection streaks.
-- **Voice Assistant** – local wake-word service (Porcupine ready) with speech-to-text and text-to-speech hooks that trigger key workflows without sending data to the cloud.
 
-## Structure
-The project is organised as a Swift Package so it can compile on CI without Xcode while still targeting iOS. Key directories:
+- 📱 Cross-platform (iOS, Android, Web)
+- 🍽️ Meal tracking with AI optimization
+- 📊 Nutrition analytics and micronutrient dashboard
+- 💪 Protein trend tracking
+- 🎯 Adaptive daily goals
+- 🔐 Biometric authentication
+- 📱 PWA with offline support
+- 🎉 Achievement badges and streak counter
 
-- `Sources/NovaCoachApp/App` – SwiftUI entry point, dependency container, and root navigation.
-- `Sources/NovaCoachApp/Core` – Core Data stack, encrypted keychain handling, notification, speech, and voice assistant services.
-- `Sources/NovaCoachApp/Domain` – Entities and use cases implementing the Clean Architecture domain layer.
-- `Sources/NovaCoachApp/Features` – MVVM view models and SwiftUI views for OKRs, 10:10s, personal logs, and analytics.
-- `Sources/NovaCoachApp/Shared` – Shared components, theming, and helpers.
-- `Tests/NovaCoachAppTests` – XCTest coverage for critical use cases.
+## Prerequisites
 
-## Running the project
-1. Open the repository in Xcode 15+ and select *File → Add Packages…* to resolve dependencies (Quick, Nimble, SnapshotTesting).
-2. Create an iOS 17+ target or use Xcode’s “New Project from Package” option to run the SwiftUI app on device or simulator.
-3. Provide a SQLCipher-enabled Core Data store key in the iOS Keychain (the `KeychainService` generates one automatically for development builds).
+- **Node.js** (v18+)
+- **npm** or **bun**
+- **Xcode** (for iOS builds)
+- **Android Studio** (for Android builds)
 
-## Tests
-Run the unit test suite with:
+## Setup
 
+1. Install dependencies:
+   ```bash
+   npm install --legacy-peer-deps
+   ```
+
+2. Configure environment variables:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+## Development
+
+Run the web app locally:
 ```bash
-swift test
+npm run dev
 ```
 
-## Documentation
-- [Tech Stack & Design Approach](docs/tech_stack_and_design.md)
+The app will be available at `http://localhost:5173`
+
+## Building
+
+### Web Build
+```bash
+npm run build
+npm run preview
+```
+
+### iOS Deployment
+
+1. Build the web app:
+   ```bash
+   npm run build
+   ```
+
+2. Sync with Capacitor:
+   ```bash
+   npx cap sync ios
+   ```
+
+3. Open in Xcode:
+   ```bash
+   npx cap open ios
+   ```
+
+4. Select your iPhone device and click the Play button to build and deploy
+
+### Android Deployment
+
+1. Build the web app:
+   ```bash
+   npm run build
+   ```
+
+2. Sync with Capacitor:
+   ```bash
+   npx cap sync android
+   ```
+
+3. Open in Android Studio:
+   ```bash
+   npx cap open android
+   ```
+
+4. Select your emulator or device and click Run
+
+## Project Structure
+
+```
+journal/
+├── src/
+│   ├── components/     # React components
+│   ├── data/          # Seed data and meal database
+│   ├── db/            # SQLite database management
+│   ├── services/      # Authentication and biometric services
+│   ├── types/         # TypeScript type definitions
+│   └── utils/         # Utility functions
+├── ios/               # iOS native project
+├── android/           # Android native project
+├── public/            # Static assets
+└── server.ts          # Express server for local development
+```
+
+## Tech Stack
+
+- **Frontend:** React 19, TypeScript, Vite
+- **Styling:** Tailwind CSS
+- **Mobile:** Capacitor 8
+- **Database:** SQLite (via sql.js)
+- **Animations:** Motion UI
+- **Icons:** Lucide React
+
+## License
+
+MIT
