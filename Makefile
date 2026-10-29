@@ -1,9 +1,24 @@
 # Single entry point for every quality gate. `make check` must pass before merging.
 # Uses the same commands as pre-commit (.pre-commit-config.yaml) and CI (.github/workflows/ci.yml).
 
-.PHONY: check lint typecheck test policy secrets audit hooks
+# Local PostgreSQL used by database tests. CI overrides PG_PORT=5432 with a service container.
+PG_HOST ?= 127.0.0.1
+PG_PORT ?= 5433
+export JOURNAL_TEST_DATABASE_URL ?= postgresql+asyncpg://$(PG_HOST):$(PG_PORT)/journal_test
 
-check: lint typecheck test policy secrets audit
+.PHONY: check preflight lint typecheck test policy secrets audit hooks db-setup
+
+check: preflight lint typecheck test policy secrets audit
+
+# Fail fast with a clear message rather than letting the database tests error out.
+preflight:
+	@pg_isready -h $(PG_HOST) -p $(PG_PORT) >/dev/null 2>&1 || \
+		(echo "PostgreSQL is not reachable at $(PG_HOST):$(PG_PORT). Start it, then run 'make db-setup'." >&2; exit 1)
+
+# Creates the development and test databases if they do not exist.
+db-setup:
+	-createdb -h $(PG_HOST) -p $(PG_PORT) journal_dev 2>/dev/null
+	-createdb -h $(PG_HOST) -p $(PG_PORT) journal_test 2>/dev/null
 
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check .

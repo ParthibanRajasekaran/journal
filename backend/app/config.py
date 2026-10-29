@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     problem_type_base: str = "https://journal.example/problems/"
+    # Local development default. Production must set JOURNAL_DATABASE_URL explicitly.
+    database_url: str = "postgresql+asyncpg://127.0.0.1:5433/journal_dev"
 
 
 @lru_cache
