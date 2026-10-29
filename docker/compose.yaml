@@ -22,8 +22,13 @@ services:
       context: ../backend
       dockerfile: ../docker/Dockerfile.api
     restart: unless-stopped
+    # Sign-in secrets (Google client secret, JWT secret) live only in this owner-only file.
+    env_file:
+      - path: ./.env
+        required: false
     environment:
       JOURNAL_ENVIRONMENT: production
+      JOURNAL_PUBLIC_BASE_URL: https://journal.getrendercheck.com
       JOURNAL_DATABASE_URL: postgresql+asyncpg://journal:${POSTGRES_PASSWORD}@db:5432/journal
     depends_on:
       db:
