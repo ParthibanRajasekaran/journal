@@ -8,8 +8,9 @@ The owner requires the whole build to cost nothing. ADR-002 chose a paid VPS (ab
 
 ## Decision
 
-Host on one Oracle Cloud Always Free Ampere A1 instance in an EU region, running the ADR-002 Compose stack (Caddy, FastAPI, PostgreSQL).
+Host on one Oracle Cloud Always Free Ampere A1 instance in the UK South (London) home region, running the ADR-002 Compose stack (Caddy, FastAPI, PostgreSQL).
 
+- **Region:** UK South (London). This is the home region of the owner's only permitted free account, and it cannot be changed after sign-up. London is outside the EU, so UK GDPR applies to the data and EU transfer rules must be confirmed by counsel (see Open items).
 - **Sizing:** one VM.Standard.A1.Flex instance at 2 OCPU and 12 GB RAM. Oracle's documentation gives each account 1,500 OCPU-hours and 9,000 GB-hours a month. Always-on, 2 OCPU × 730 h = 1,460 OCPU-h and 12 GB × 730 h = 8,760 GB-h, both inside the limit. Do not create a second A1 instance. Verify the figures in the console before use, because the sources disagreed before the official page was checked.
 - **No paid upgrade:** the account stays on Always Free. Do not add a paid upgrade or other paid services.
 - **Backups:** nightly encrypted `pg_dump`, stored off the VM. Destination to be chosen from free options (for example Cloudflare R2's free tier, verified before use).
@@ -37,6 +38,7 @@ Host on one Oracle Cloud Always Free Ampere A1 instance in an EU region, running
 
 ## Open items
 
-- Confirm the Oracle account, EU region, and instance shape in the console before any deployment.
+- Confirm the instance shape in the console before any deployment (the account and region are confirmed).
+- Counsel to confirm that a UK-hosted server is acceptable for EU and UK users (UK GDPR and EU transfer rules). Until then, treat the launch as not cleared for EU users.
 - Choose the free backup destination and verify its limits.
 - Confirm the Cloudflare free-plan rate rules and tunnel terms.
