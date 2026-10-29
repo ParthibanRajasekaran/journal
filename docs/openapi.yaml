@@ -15,6 +15,7 @@ servers:
     description: Placeholder production URL
 security:
   - bearerAuth: []
+  - cookieAuth: []
 tags:
   - name: Auth
   - name: Me
@@ -26,60 +27,86 @@ tags:
   - name: Health
 
 paths:
-  /auth/google/exchange:
-    post:
+  /auth/google/start:
+    get:
       tags: [Auth]
-      operationId: exchangeGoogleCode
-      summary: Exchange a Google authorization code for Journal tokens
-      description: Creates the account on first use. PKCE code verifier is required.
+      operationId: startGoogleSignIn
+      summary: Redirect the browser to Google to sign in
+      description: |
+        Sets a short-lived, HttpOnly state cookie holding state, nonce, and the PKCE
+        verifier. The client secret stays on the server (ADR-004).
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/GoogleExchangeRequest' }
       responses:
-        '200':
-          description: Tokens issued
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TokenPair' }
+        '302':
+          description: Redirect to Google's consent screen
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '503': { $ref: '#/components/responses/Problem' }
+
+  /auth/google/callback:
+    get:
+      tags: [Auth]
+      operationId: googleCallback
+      summary: Google returns here after consent
+      description: |
+        Checks state against the cookie, exchanges the code, verifies the ID token
+        (signature, issuer, audience, expiry, nonce, verified email), creates the
+        account on first sign-in, and sets HttpOnly session cookies.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema: { type: string, maxLength: 2048 }
+        - name: state
+          in: query
+          required: false
+          schema: { type: string, maxLength: 256 }
+        - name: error
+          in: query
+          required: false
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '303':
+          description: Signed in; cookies set. Redirects to /api/v1/me.
+          headers:
+            Location:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/Problem' }
         '401': { $ref: '#/components/responses/Problem' }
-        '429': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
 
   /auth/refresh:
     post:
       tags: [Auth]
-      operationId: refreshTokens
-      summary: Rotate the refresh token
-      description: Reuse of a rotated token revokes the whole token family.
+      operationId: refreshSession
+      summary: Rotate the refresh cookie and issue a new access cookie
+      description: |
+        Reads the HttpOnly refresh cookie. Each token is single use. Presenting a
+        used token revokes the whole family. Requires the X-Journal-Request header.
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [refresh_token]
-              properties:
-                refresh_token: { type: string, minLength: 20 }
-              additionalProperties: false
+      parameters:
+        - $ref: '#/components/parameters/JournalRequest'
       responses:
-        '200':
-          description: New token pair
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TokenPair' }
+        '204':
+          description: New cookies set
         '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /auth/logout:
     post:
       tags: [Auth]
       operationId: logout
-      summary: Revoke the current session
+      summary: End the session and revoke its refresh family
+      parameters:
+        - $ref: '#/components/parameters/JournalRequest'
       responses:
-        '204': { description: Revoked }
+        '204':
+          description: Signed out; cookies cleared
         '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /me:
     get:
@@ -389,8 +416,20 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: For native clients (ADR-003). Access tokens last 15 minutes.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: journal_access
+      description: Set by sign-in for the web client. HttpOnly, SameSite=Strict.
 
   parameters:
+    JournalRequest:
+      name: X-Journal-Request
+      in: header
+      required: true
+      description: CSRF guard. Cross-site forms cannot set custom headers, and no CORS grant is made.
+      schema: { type: string, enum: ['1'] }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -428,24 +467,6 @@ components:
             properties:
               field: { type: string }
               message: { type: string }
-
-    GoogleExchangeRequest:
-      type: object
-      required: [code, code_verifier, redirect_uri]
-      properties:
-        code: { type: string }
-        code_verifier: { type: string, minLength: 43, maxLength: 128 }
-        redirect_uri: { type: string, format: uri }
-      additionalProperties: false
-
-    TokenPair:
-      type: object
-      required: [access_token, refresh_token, expires_in, token_type]
-      properties:
-        access_token: { type: string }
-        refresh_token: { type: string }
-        expires_in: { type: integer, const: 900, description: 15 minutes }
-        token_type: { type: string, const: Bearer }
 
     Profile:
       type: object

@@ -18,7 +18,8 @@ HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
 # The only operations allowed without a bearer token (ADR-001 "Auth and limits").
 PUBLIC_OPERATIONS = {
-    ("/auth/google/exchange", "post"),
+    ("/auth/google/start", "get"),
+    ("/auth/google/callback", "get"),
     ("/auth/refresh", "post"),
     ("/health", "get"),
 }
@@ -50,8 +51,8 @@ SPEC = _load_spec()
 OPERATIONS = _operations(SPEC)
 
 
-def test_spec_declares_global_bearer_security() -> None:
-    assert SPEC.get("security") == [{"bearerAuth": []}]
+def test_spec_accepts_bearer_or_session_cookie() -> None:
+    assert SPEC.get("security") == [{"bearerAuth": []}, {"cookieAuth": []}]
 
 
 def test_spec_has_operations() -> None:

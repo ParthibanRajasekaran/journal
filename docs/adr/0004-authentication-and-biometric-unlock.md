@@ -119,3 +119,12 @@ Read 2026-10-29 unless noted.
 7. Android, Keystore system. https://developer.android.com/privacy-and-security/keystore
 8. Lucid, refresh token theft false positives, Sep 2023 (secondary). https://lucid.co/techblog/2023/09/18/avoiding-false-positives-in-oauth-2-0-refresh-token-theft-detection
 9. Referenced, not re-fetched: RFC 6749, RFC 7636 (https://www.rfc-editor.org/rfc/rfc7636), OpenID Connect Core 1.0 (https://openid.net/specs/openid-connect-core-1_0.html).
+
+## Implementation decision (2026-10-29)
+
+The web flow is implemented as the backend-confidential design described above:
+
+- `GET /api/v1/auth/google/start` sets a signed, 10-minute state cookie (state, nonce, PKCE verifier) and redirects to Google.
+- `GET /api/v1/auth/google/callback` checks state, exchanges the code with the client secret, verifies the ID token (RS256 only, issuer, audience, expiry with 60 s leeway, nonce, verified email), creates the account on first sign-in, and sets two HttpOnly cookies: `journal_access` (15 minutes, path `/`) and `journal_refresh` (30 days, path `/api/v1/auth`), both SameSite=Strict.
+- `POST /api/v1/auth/refresh` and `POST /api/v1/auth/logout` require the `X-Journal-Request: 1` header. Refresh tokens are opaque, stored only as SHA-256 hashes, rotated on every use, and reuse revokes the whole family.
+- Native clients are not implemented yet and will use a separate public-client flow.
