@@ -90,3 +90,24 @@ class Meal(Base):
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RefreshToken(Base):
+    """Opaque refresh tokens are stored only as SHA-256 hashes (ADR-004).
+
+    A rotated token gets used_at set. Presenting a used token revokes its whole family.
+    """
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (Index("family_id", "family_id"),)
+
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("rt"))
+    user_id: Mapped[str] = mapped_column(
+        String(48), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    family_id: Mapped[str] = mapped_column(String(48))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
