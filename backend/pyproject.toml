@@ -1,0 +1,45 @@
+[project]
+name = "journal-api"
+version = "0.1.0"
+description = "Journal meal-logging API (see docs/adr/0001-backend-and-api.md)"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "mypy>=2.4.1",
+    "pip-audit>=2.10.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pyyaml>=6.0.3",
+    "ruff>=0.17.3",
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I",   # pycodestyle, pyflakes, isort
+    "B",                  # bugbear
+    "S",                  # bandit-style security rules
+    "UP",                 # pyupgrade
+    "SIM",                # simplifications
+    "ASYNC",              # async pitfalls
+    "PT",                 # pytest style
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]     # assert is expected in tests
+
+[tool.mypy]
+strict = true
+files = ["tests"]
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

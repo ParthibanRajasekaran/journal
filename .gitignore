@@ -18,3 +18,15 @@ ios/App/Pods/
 ios/App/build/
 ios/App/DerivedData/
 *.bundle
+
+# Backend and tooling caches
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+coverage.xml
+htmlcov/
+__pycache__/
+*.pyc
+.coverage
+.coverage.*
