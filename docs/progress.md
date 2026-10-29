@@ -17,6 +17,7 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 | 0 | Quality gates (`make check`, pre-commit, CI) | Done | Platform | Verified: gates fail on broken spec, leaked key, oversized file |
 | 2 | Policy-as-code (`policy/`) | Estimate policy tested (10/10); authz and consent untested | Security | Tests for authz and consent land with steps 3, 4, 6 |
 | 1 | API skeleton: `/api/v1/health`, RFC 9457 errors, route policy, contract drift, Schemathesis | Done | Backend | 79 tests; Schemathesis verified to fail on a contract-breaking response |
+| 4 | Deployment (test): Oracle VM, hardening, Docker, Caddy HTTPS at journal.getrendercheck.com | Live, no real user data | Platform | Health check passes over HTTPS; docs hidden; security headers set. Not for real data until sign-in and per-user access are built |
 | 2 | Database and migrations: users and meals tables, Alembic, constraints | Done | Backend | 17 database tests on PostgreSQL 18; models and migrations checked for drift; PostgreSQL 18 runs on port 5433 (started by hand; it does not restart after reboot) |
 | 2 | Mobile and web shell (Capacitor) | Not started | | Blocked on ADR acceptance |
 | 3 | Eval set (150 labelled meals) | Not started | | Needed for ADR-005 drift gate |

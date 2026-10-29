@@ -1,0 +1,55 @@
+# Journal app stack: Caddy (HTTPS), FastAPI API, PostgreSQL. See docs/adr/0002 and 0007.
+# Only Caddy publishes ports. The API and database stay on the internal network.
+name: journal
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks: [internal]
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      JOURNAL_ENVIRONMENT: production
+      JOURNAL_DATABASE_URL: postgresql+asyncpg://journal:${POSTGRES_PASSWORD}@db:5432/journal
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: journal
+      POSTGRES_USER: journal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U journal -d journal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal: {}
