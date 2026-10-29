@@ -3,17 +3,23 @@ name = "journal-api"
 version = "0.1.0"
 description = "Journal meal-logging API (see docs/adr/0001-backend-and-api.md)"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.0",
+    "pydantic-settings>=2.16.2",
+    "uvicorn>=0.54.0",
+]
 
 [dependency-groups]
 dev = [
     "bandit>=1.9.4",
+    "httpx>=0.28.1",
     "mypy>=2.4.1",
     "pip-audit>=2.10.1",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pyyaml>=6.0.3",
     "ruff>=0.17.3",
+    "schemathesis>=4.32.7",
     "types-pyyaml>=6.0.12.20260906",
 ]
 
@@ -37,9 +43,10 @@ select = [
 
 [tool.mypy]
 strict = true
-files = ["tests"]
+files = ["app", "tests"]
 python_version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra --strict-markers"

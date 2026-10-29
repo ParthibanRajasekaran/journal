@@ -12,7 +12,7 @@ typecheck:
 	cd backend && uv run mypy
 
 test:
-	cd backend && uv run pytest --cov --cov-report=term-missing
+	cd backend && uv run pytest --cov=app --cov=tests --cov-report=term-missing --cov-fail-under=90
 
 policy:
 	opa check policy
@@ -24,6 +24,7 @@ secrets:
 
 audit:
 	cd backend && uv run pip-audit
+	cd backend && uv run bandit -q -r app
 	cd backend && uv run bandit -q -r tests -s B101   # assert is the test idiom; app code will not skip it
 
 hooks:

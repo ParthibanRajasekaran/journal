@@ -1,0 +1,3 @@
+# Reviewed false positives. Each line is one gitleaks fingerprint; add a reason in a comment above it.
+# ADR-001 example request header: a UUIDv4 documentation example, not a credential.
+ba1cd2244d62175a357f12fde17109326128ef5e:docs/adr/0001-backend-and-api.md:generic-api-key:58
