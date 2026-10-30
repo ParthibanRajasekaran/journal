@@ -1,0 +1,76 @@
+# Observability overlay for the Journal stack. Apply with:
+#   docker compose -f compose.yaml -f observability/compose.yaml up -d
+# Nothing here publishes a port except Grafana, and that is bound to the server's loopback address,
+# so it is reached only through an SSH tunnel. Every service has a memory limit (a 12 GB VM is shared).
+name: journal
+
+services:
+  api:
+    environment:
+      JOURNAL_OTEL_ENDPOINT: http://otel-collector:4318
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    restart: unless-stopped
+    # Runs as root only so it can read Docker's log files, which are mounted read-only.
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+      # Read-only access to Docker's container log files, which the collector ships to Loki.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    mem_limit: 256m
+    networks: [internal]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=14d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    mem_limit: 384m
+    networks: [internal]
+
+  loki:
+    image: grafana/loki:3.3.2
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/config.yaml:ro
+      - loki_data:/loki
+    mem_limit: 384m
+    networks: [internal]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: memory
+    mem_limit: 256m
+    networks: [internal]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in docker/.env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/journal.yaml:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 256m
+    networks: [internal]
+
+volumes:
+  prometheus_data:
+  loki_data:
+  grafana_data:

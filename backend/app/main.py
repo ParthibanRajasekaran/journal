@@ -1,5 +1,7 @@
 """Application factory. Routes are mounted under /api/v1 (ADR-001 versioning)."""
 
+import logging
+
 import httpx
 from fastapi import APIRouter, FastAPI
 from jwt import PyJWKClient
@@ -19,6 +21,9 @@ API_PREFIX = "/api/v1"
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     telemetry.configure_logging()
+    logging.getLogger("journal").info(
+        "api started", extra={"fields": {"environment": settings.environment}}
+    )
     production = settings.environment == "production"
     app = FastAPI(
         title="Journal API",

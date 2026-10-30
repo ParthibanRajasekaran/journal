@@ -1,0 +1,61 @@
+# OpenTelemetry Collector. Receives the API's traces, metrics and logs on the internal network,
+# removes anything sensitive as a second line of defence, and forwards each signal.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+  filelog:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    start_at: end
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+  # Keep only the API's own JSON log lines. Access logs and database logs stay out of Loki.
+  filter/api_logs:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'not IsMatch(body, ".*\"logger\":\"journal.*")'
+  # Second line of defence: drop request headers and bodies even if application code adds them.
+  attributes/redact:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: http.request.body
+        action: delete
+      - key: http.response.body
+        action: delete
+      - key: user.email
+        action: delete
+  batch:
+    timeout: 10s
+
+exporters:
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+service:
+  extensions: []
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/redact, batch]
+      exporters: [otlphttp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/redact, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [filelog]
+      processors: [memory_limiter, filter/api_logs, batch]
+      exporters: [otlphttp/loki]

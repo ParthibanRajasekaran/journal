@@ -1,0 +1,32 @@
+# Alert rules for the Journal API. Each alert links to a runbook entry in docs/observability.md.
+groups:
+  - name: journal
+    rules:
+      - alert: TelemetryCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: The OpenTelemetry Collector is not answering. Check the otel-collector container.
+
+      - alert: EstimateErrorsHigh
+        expr: |
+          sum by (provider) (rate(journal_estimate_outcome_total{outcome="error"}[15m]))
+            /
+          clamp_min(sum by (provider) (rate(journal_estimate_outcome_total[15m])), 1e-9)
+            > 0.10
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: More than 10% of estimates for {{ $labels.provider }} are failing. Check the provider's status page and consider switching provider.
+
+      - alert: EstimateInvalidHigh
+        expr: |
+          sum(rate(journal_estimate_outcome_total{outcome="invalid"}[30m]))
+            /
+          clamp_min(sum(rate(journal_estimate_outcome_total[30m])), 1e-9)
+            > 0.25
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: Over a quarter of estimate replies are being refused as invalid. The prompt or the provider model may have drifted.

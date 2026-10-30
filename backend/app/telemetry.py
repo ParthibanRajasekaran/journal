@@ -33,9 +33,13 @@ SENSITIVE_FIELDS = frozenset(
 )
 
 
+log = logging.getLogger("journal")
+
+
 def estimate_outcome(outcome: str, provider: str) -> None:
-    """Count one estimate result. Labels are low cardinality: provider and outcome only."""
+    """Count one estimate result, and log it with the same two low-cardinality fields."""
     _estimate_counter().add(1, {"provider": provider, "outcome": outcome})
+    log.info("estimate finished", extra={"fields": {"provider": provider, "outcome": outcome}})
 
 
 _counter: Any = None
