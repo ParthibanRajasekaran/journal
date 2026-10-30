@@ -774,6 +774,7 @@ components:
       - id
       - email
       - daily_targets
+      - encouragement_enabled
       properties:
         id:
           type: string
@@ -785,6 +786,9 @@ components:
           maxLength: 80
         daily_targets:
           $ref: '#/components/schemas/DailyTargets'
+        encouragement_enabled:
+          type: boolean
+          description: Buddy encouragement on save, on Week, and later streaks. Off hides every encouragement element.
     ProfilePatch:
       type: object
       properties:
@@ -793,6 +797,8 @@ components:
           maxLength: 80
         daily_targets:
           $ref: '#/components/schemas/DailyTargets'
+        encouragement_enabled:
+          type: boolean
       additionalProperties: false
     DailyTargets:
       type: object

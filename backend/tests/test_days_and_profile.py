@@ -111,6 +111,23 @@ def test_profile_targets_are_saved_and_validated(
     )
 
 
+def test_buddy_encouragement_is_on_by_default_and_can_be_switched_off(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    assert client.get("/api/v1/me").json()["encouragement_enabled"] is True
+
+    off = client.patch("/api/v1/me", json={"encouragement_enabled": False}, headers=CSRF)
+    assert off.status_code == 200
+    assert off.json()["encouragement_enabled"] is False
+
+    # Switching it off leaves the targets alone, and it stays off on the next visit.
+    assert client.get("/api/v1/me").json()["encouragement_enabled"] is False
+
+    client.patch("/api/v1/me", json={"encouragement_enabled": True}, headers=CSRF)
+    assert client.get("/api/v1/me").json()["encouragement_enabled"] is True
+
+
 def test_deleting_the_account_removes_meals_and_ends_the_session(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

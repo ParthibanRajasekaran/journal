@@ -24,6 +24,7 @@ class ProfilePatch(BaseModel):
 
     display_name: Annotated[str | None, Field(max_length=80)] = None
     daily_targets: DailyTargetsPatch | None = None
+    encouragement_enabled: bool | None = None
 
 
 def _profile(user: User) -> dict[str, Any]:
@@ -37,6 +38,7 @@ def _profile(user: User) -> dict[str, Any]:
             if user.target_protein_g is not None
             else None,
         },
+        "encouragement_enabled": user.encouragement_enabled,
     }
 
 
@@ -60,6 +62,8 @@ async def update_me(
     user = await _current(session, user_id)
     if "display_name" in body.model_fields_set:
         user.display_name = body.display_name
+    if body.encouragement_enabled is not None:
+        user.encouragement_enabled = body.encouragement_enabled
     if body.daily_targets is not None:
         targets = body.daily_targets.model_dump(exclude_unset=True)
         if "calories" in targets:

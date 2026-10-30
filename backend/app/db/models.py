@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,6 +59,10 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(80))
     target_calories: Mapped[int | None] = mapped_column(Integer)
     target_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    # The buddy encouragement switch. On by default; off hides every encouragement element.
+    encouragement_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
