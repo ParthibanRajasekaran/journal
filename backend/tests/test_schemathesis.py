@@ -18,6 +18,7 @@ from pydantic import SecretStr
 from schemathesis.openapi import from_asgi
 
 from app.config import Settings
+from app.errors import install_problem_handlers
 from app.main import create_app
 
 CONTRACT_PATH = Path(__file__).resolve().parents[2] / "docs" / "openapi.yaml"
@@ -28,6 +29,10 @@ def _contract_host(real_app: FastAPI) -> FastAPI:
     """Serve the contract file from a wrapper app; the real app handles all API calls."""
     contract: dict[str, Any] = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
     host = FastAPI()
+    # The wrapper answers requests our app never sees (odd path encodings), so it needs the same
+    # error format the app uses. Production has no wrapper: Caddy forwards straight to the app.
+    host.state.settings = real_app.state.settings
+    install_problem_handlers(host)
 
     @host.get("/_contract.json", include_in_schema=False)
     async def contract_document() -> JSONResponse:
