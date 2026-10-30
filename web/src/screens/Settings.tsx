@@ -21,6 +21,7 @@ export function Settings({ profile, onProfile, onSignedOut }: Props) {
       <div className="settings-grid">
         <div>
           <TargetsForm profile={profile} onSaved={onProfile} />
+          <EncouragementCard profile={profile} onSaved={onProfile} />
           <section className="card">
             <h2 style={{ marginTop: 0 }}>Account</h2>
             <p className="muted">Signed in as {profile.email}</p>
@@ -74,6 +75,41 @@ function TargetsForm({ profile, onSaved }: { profile: Profile; onSaved: (p: Prof
         <button type="submit" className="primary">Save targets</button>
       </div>
     </form>
+  );
+}
+
+// The buddy switch. It saves at once, and off hides every encouragement element.
+function EncouragementCard({ profile, onSaved }: { profile: Profile; onSaved: (p: Profile) => void }) {
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function toggle(on: boolean) {
+    setMessage(null);
+    try {
+      onSaved(await api.updateMe({ encouragement_enabled: on }));
+    } catch (err) {
+      setMessage((err as Error).message);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>Encouragement</h2>
+      <label className="switch-row">
+        <span>
+          <strong>Show encouragement</strong>
+          <span className="muted">
+            {" "}A gentle note when you log, and when you reach a protein goal. Turn it off to hide every note.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={profile.encouragement_enabled}
+          onChange={(e) => void toggle(e.target.checked)}
+        />
+      </label>
+      {message && <p className="error" role="alert">{message}</p>}
+    </section>
   );
 }
 

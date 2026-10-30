@@ -45,9 +45,9 @@ Most nutrition apps ask people to log too much, too often, and show them numbers
 
 - Codebase or data export, backup, and import (remove; revisit with a proper data-portability feature later).
 - PWA install prompts.
-- Pro tier, paywalls, achievements, streaks, confetti, and coach tips.
+- Pro tier, paywalls, achievements, badges, confetti, and coach tips. Buddy encouragement is in scope (see `prd-features/buddy-encouragement.md`) and can be switched off in Settings. Streaks stay out until that PRD's phase 3 is signed off.
 - Next-meal recommender and generated/seed meal history.
-- Micronutrient dashboard, analytics dashboards, and trend charts beyond the Week list.
+- Micronutrient dashboard, analytics dashboards, and trend charts beyond the Week list. A fibre and vitamin glimpse is allowed only after the owner approves phase 4 of the buddy PRD.
 - Hydration tracking, multi-user households, sharing, social features, and wearable integrations.
 - Medical advice or condition-specific diet plans.
 

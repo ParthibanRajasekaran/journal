@@ -103,7 +103,7 @@ export function App() {
                 setScreen({ name: "today", day });
               }}
               onAdd={() => setScreen({ name: "add", day: screen.day })}
-              savedNote={justSaved}
+              savedNote={justSaved && profile.encouragement_enabled}
             />
           )}
           {screen.name === "add" && (
@@ -117,7 +117,11 @@ export function App() {
             />
           )}
           {screen.name === "week" && (
-            <Week onOpenDay={(day) => setScreen({ name: "today", day })} proteinTarget={profile.daily_targets.protein_g} />
+            <Week
+              onOpenDay={(day) => setScreen({ name: "today", day })}
+              proteinTarget={profile.daily_targets.protein_g}
+              encourage={profile.encouragement_enabled}
+            />
           )}
           {screen.name === "settings" && <Settings profile={profile} onProfile={setProfile} onSignedOut={() => setProfile(null)} />}
         </div>

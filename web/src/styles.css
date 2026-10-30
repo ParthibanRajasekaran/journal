@@ -253,6 +253,9 @@ nav.tabs a.tab-add { color: var(--accent-ink); background: var(--accent); font-w
 }
 @keyframes pop-check { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
 .encourage p { margin: 0 0 6px; font-size: 16px; }
+.switch-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0; cursor: pointer; }
+.switch-row > span { display: block; }
+.switch-row input[type="checkbox"] { width: 22px; height: 22px; min-width: 22px; margin-top: 2px; }
 .encourage .fine-print { margin-top: 10px; text-align: left; }
 
 /* Info panel for the ⓘ tips */

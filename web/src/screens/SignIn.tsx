@@ -28,7 +28,7 @@ export function SignIn() {
         )}
 
         <ul className="promises">
-          <li>Only you see your meals in Journal.</li>
+          <li>Your meal notes are yours. Estimates use only the AI account you choose.</li>
           <li>We never sell your data.</li>
           <li>Delete everything, any time, from Settings.</li>
         </ul>

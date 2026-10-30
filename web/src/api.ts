@@ -45,6 +45,7 @@ export interface Profile {
   email: string;
   display_name: string | null;
   daily_targets: { calories: number | null; protein_g: number | null };
+  encouragement_enabled: boolean;
 }
 
 export interface AiKeyStatus {
@@ -132,7 +133,11 @@ export const api = {
   signInUrl: `${BASE}/auth/google/start`,
   me: () => request<Profile>("GET", "/me"),
   // A target set to null is cleared.
-  updateMe: (patch: { display_name?: string; daily_targets?: { calories?: number | null; protein_g?: number | null } }) =>
+  updateMe: (patch: {
+    display_name?: string;
+    daily_targets?: { calories?: number | null; protein_g?: number | null };
+    encouragement_enabled?: boolean;
+  }) =>
     request<Profile>("PATCH", "/me", patch),
   deleteAccount: () => request<void>("DELETE", "/me"),
   logout: () => request<void>("POST", "/auth/logout"),

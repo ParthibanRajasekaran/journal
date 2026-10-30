@@ -6,9 +6,11 @@ import { APPROXIMATE, weekLines } from "../encouragement";
 interface Props {
   onOpenDay: (day: string) => void;
   proteinTarget: number | null;
+  // When off, no encouragement is shown at all.
+  encourage: boolean;
 }
 
-export function Week({ onOpenDay, proteinTarget }: Props) {
+export function Week({ onOpenDay, proteinTarget, encourage }: Props) {
   const [start, setStart] = useState(() => mondayOf(localDay()));
   const [days, setDays] = useState<Totals[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function Week({ onOpenDay, proteinTarget }: Props) {
           <button className="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
         </section>
       )}
-      {days && (
+      {days && encourage && (
         <section className="card encourage" aria-label="Your week">
           {weekLines(days, proteinTarget).map((line) => (
             <p key={line}>{line}</p>
