@@ -393,3 +393,9 @@ fieldset.question legend { font-weight: 600; padding: 0 6px; }
 .split-legend li { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 8px; font-size: 15px; }
 .split-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .macro-empty { margin: 14px 0 0; }
+
+/* Estimating: an hourglass turns while the provider works */
+.estimating { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+.hourglass { color: var(--accent); flex: none; animation: hourglass-turn 2.4s var(--ease) infinite; transform-origin: 50% 50%; }
+@keyframes hourglass-turn { 0%, 40% { transform: rotate(0deg); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+.saved-note .check { font-size: 15px; background: transparent; color: inherit; }

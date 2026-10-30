@@ -15,12 +15,16 @@ interface Props {
   savedNote: boolean;
 }
 
+// A small, warm acknowledgement after each save. It is chosen once per visit to Today.
+const SAVED_ICONS = ["👍", "👏", "💚"];
+
 export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(savedNote);
+  const [savedIcon] = useState(() => SAVED_ICONS[Math.floor(Math.random() * SAVED_ICONS.length)]);
 
   // The confirmation fades on its own, and a tap dismisses it.
   useEffect(() => {
@@ -63,7 +67,7 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
 
       {showSaved && summary && (
         <p className="saved-note" role="status" onClick={() => setShowSaved(false)}>
-          <span className="check" aria-hidden="true">✓</span>
+          <span className="check" aria-hidden="true">{savedIcon}</span>
           {savedLine(summary.protein_g, summary.targets.protein_g)}
         </p>
       )}

@@ -211,6 +211,12 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
             {estimating ? "Working…" : hasEstimate ? "Re-estimate" : "Estimate"}
           </button>
         </div>
+        {estimating && (
+          <p className="estimating" role="status">
+            <Hourglass />
+            Estimating your meal…
+          </p>
+        )}
         {estimateError && <p className="error" role="alert">{estimateError}</p>}
         {!hasEstimate && !manual && (
           <button type="button" className="ghost other-link" onClick={() => setManual(true)}>
@@ -338,5 +344,15 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         </div>
       )}
     </form>
+  );
+}
+
+// An hourglass that turns while the estimate runs. Reduced motion shows it still.
+function Hourglass() {
+  return (
+    <svg className="hourglass" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 2h12M6 22h12M7 2c0 5 10 5 10 10S7 17 7 22M17 2c0 5-10 5-10 10s10 5 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 19c0-2 3-3 3-5s-3-3-3-5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
   );
 }
