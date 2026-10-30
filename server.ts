@@ -575,15 +575,6 @@ async function startServer() {
   // Serve static assets from public folder
   app.use(express.static(path.resolve(__dirname, 'public')));
 
-  // Direct in-browser download routes
-  app.get('/journal-nutrition.bundle', (_req, res) => {
-    res.download(path.resolve(__dirname, 'public', 'journal-nutrition.bundle'), 'journal-nutrition.bundle');
-  });
-
-  app.get('/journal-nutrition.tar.gz', (_req, res) => {
-    res.download(path.resolve(__dirname, 'public', 'journal-nutrition.tar.gz'), 'journal-nutrition.tar.gz');
-  });
-
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

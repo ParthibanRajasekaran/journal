@@ -1,5 +1,5 @@
 import React from 'react';
-import { Leaf, Calendar, ChevronLeft, ChevronRight, Plus, Sparkles, BarChart3, Settings, Shield, FolderDown } from 'lucide-react';
+import { Leaf, Calendar, ChevronLeft, ChevronRight, Plus, Sparkles, BarChart3, Settings, Shield } from 'lucide-react';
 import { getTodayDateString, getYesterdayDateString } from '../data/seedMeals';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -11,7 +11,6 @@ interface HeaderProps {
   activeTab: 'log' | 'analytics' | 'settings';
   onChangeTab: (tab: 'log' | 'analytics' | 'settings') => void;
   onLockApp?: () => void;
-  onOpenDownload?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,7 +20,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onChangeTab,
   onLockApp,
-  onOpenDownload,
 }) => {
   const todayStr = getTodayDateString();
   const yesterdayStr = getYesterdayDateString();
@@ -123,20 +121,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs, Sync Status, PWA Install & Desktop Action */}
         <div className="flex items-center gap-2">
-          {/* Export & Download Codebase Button */}
-          {onOpenDownload && (
-            <button
-              type="button"
-              onClick={onOpenDownload}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-stone-100 hover:bg-stone-200/80 text-stone-800 border border-stone-200/80 transition-all cursor-pointer shadow-2xs active:scale-95"
-              title="Download full project code & push to GitHub"
-            >
-              <FolderDown className="w-3.5 h-3.5 text-stone-700" />
-              <span className="hidden sm:inline">Export Code</span>
-              <span className="sm:hidden">Code</span>
-            </button>
-          )}
-
           {/* PWA Install Button */}
           <PWAInstallButton />
 

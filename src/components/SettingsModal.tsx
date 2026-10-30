@@ -11,7 +11,6 @@ import {
   Shield,
   Fingerprint,
   Lock,
-  FolderArchive,
   ExternalLink,
   KeyRound,
   Bot,
@@ -319,50 +318,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
               </div>
             )}
-          </div>
-
-          {/* Direct In-Browser Export (Bypasses curl session blocks) */}
-          <div className="pt-4 border-t border-stone-100 space-y-2.5">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 block">
-                Export Native Codebase & GitHub Bundle
-              </span>
-              <span className="text-[11px] text-stone-500 block">
-                Download directly in your active browser session (no curl authentication required).
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <a
-                href="/journal-nutrition.bundle"
-                download="journal-nutrition.bundle"
-                className="flex items-center justify-between p-3 rounded-xl border border-emerald-300/80 bg-emerald-50/50 hover:bg-emerald-100/60 transition-colors text-xs font-medium text-emerald-950 group"
-              >
-                <div className="flex items-center gap-2">
-                  <FolderArchive className="w-4 h-4 text-emerald-700" />
-                  <div>
-                    <span className="font-semibold block">Git Bundle</span>
-                    <span className="text-[10px] text-stone-500 block">Includes git history & tags (~0.9 MB)</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-emerald-700 group-hover:translate-y-0.5 transition-transform" />
-              </a>
-
-              <a
-                href="/journal-nutrition.tar.gz"
-                download="journal-nutrition.tar.gz"
-                className="flex items-center justify-between p-3 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-900 group"
-              >
-                <div className="flex items-center gap-2">
-                  <FolderArchive className="w-4 h-4 text-stone-600" />
-                  <div>
-                    <span className="font-semibold block">Full Archive (.tar.gz)</span>
-                    <span className="text-[10px] text-stone-500 block">iOS, Android & Web source code</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-stone-600 group-hover:translate-y-0.5 transition-transform" />
-              </a>
-            </div>
           </div>
 
           {/* AI Model Engine & BYOM Configuration */}

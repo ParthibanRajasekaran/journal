@@ -15,7 +15,6 @@ import { MealTimeline } from './components/MealTimeline';
 import { AnalyticsView } from './components/AnalyticsView';
 import { HybridCaptureModal } from './components/HybridCaptureModal';
 import { SettingsModal } from './components/SettingsModal';
-import { ProjectDownloadModal } from './components/ProjectDownloadModal';
 import { LegalMedicalDisclaimerModal } from './components/LegalMedicalDisclaimerModal';
 import { SmartHydrationBanner } from './components/SmartHydrationBanner';
 import { ProTipCard } from './components/ProTipCard';
@@ -141,7 +140,6 @@ export default function App() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [captureMealType, setCaptureMealType] = useState<MealType>('lunch');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
 
   // Check incoming assistant deep link (Siri / Claude / URL Scheme)
@@ -356,7 +354,6 @@ export default function App() {
           }
         }}
         onLockApp={() => setIsLocked(true)}
-        onOpenDownload={() => setIsDownloadOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -486,12 +483,6 @@ export default function App() {
         onResetSeedData={handleResetSeedData}
         onLockApp={() => setIsLocked(true)}
         onOpenDisclaimer={() => setIsDisclaimerOpen(true)}
-      />
-
-      {/* Direct In-Browser Project Download Modal */}
-      <ProjectDownloadModal
-        isOpen={isDownloadOpen}
-        onClose={() => setIsDownloadOpen(false)}
       />
 
       {/* App Store & Play Store Medical Disclaimer Modal */}
