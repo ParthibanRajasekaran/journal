@@ -20,6 +20,7 @@ from schemathesis.openapi import from_asgi
 from app.config import Settings
 from app.errors import install_problem_handlers
 from app.main import create_app
+from tests.dbsupport import test_database_url
 
 CONTRACT_PATH = Path(__file__).resolve().parents[2] / "docs" / "openapi.yaml"
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
@@ -57,6 +58,8 @@ _real_app = create_app(
         jwt_secret=SecretStr("test-secret-that-is-at-least-32-characters-long"),
         google_client_id="test-client.apps.googleusercontent.com",
         google_client_secret=SecretStr("test-client-secret"),
+        database_url=test_database_url(),
+        cookie_secure=False,
     )
 )
 from tests.conftest import TEST_KEY_B64  # noqa: E402
