@@ -36,6 +36,13 @@ def require_csrf(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Missing request header.")
 
 
+def require_write(request: Request, user_id: str) -> None:
+    """Every state-changing request: CSRF header first, then the per-user write limit."""
+    require_csrf(request)
+    if not request.app.state.write_limiter.allow(user_id):
+        raise HTTPException(status_code=429, detail="Too many changes. Try again in a minute.")
+
+
 def current_user_id(request: Request) -> str:
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:

@@ -7,6 +7,7 @@ from app.auth.google import JWKS_URL
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_session_factory
 from app.errors import install_problem_handlers
+from app.limits import WriteLimiter
 from app.routes import auth, days, health, me, meals
 
 API_PREFIX = "/api/v1"
@@ -27,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = make_session_factory(engine)
     app.state.jwks = PyJWKClient(JWKS_URL, cache_keys=True)
+    app.state.write_limiter = WriteLimiter(settings.write_requests_per_minute)
     install_problem_handlers(app)
 
     api = APIRouter(prefix=API_PREFIX)

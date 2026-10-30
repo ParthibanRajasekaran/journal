@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 
-from app.auth.deps import CurrentUserId, SessionDep, require_csrf
+from app.auth.deps import CurrentUserId, SessionDep, require_write
 from app.db.models import User
 
 router = APIRouter(tags=["Me"])
@@ -56,7 +56,7 @@ async def get_me(user_id: CurrentUserId, session: SessionDep) -> dict[str, Any]:
 async def update_me(
     request: Request, user_id: CurrentUserId, session: SessionDep, body: ProfilePatch
 ) -> dict[str, Any]:
-    require_csrf(request)
+    require_write(request, user_id)
     user = await _current(session, user_id)
     if "display_name" in body.model_fields_set:
         user.display_name = body.display_name
@@ -74,7 +74,7 @@ async def update_me(
 @router.delete("/me", operation_id="deleteAccount", status_code=204)
 async def delete_account(request: Request, user_id: CurrentUserId, session: SessionDep) -> Response:
     """Removes the user. Meals and refresh tokens go with them (ON DELETE CASCADE)."""
-    require_csrf(request)
+    require_write(request, user_id)
     await session.execute(delete(User).where(User.id == user_id))
     await session.commit()
     response = Response(status_code=204)

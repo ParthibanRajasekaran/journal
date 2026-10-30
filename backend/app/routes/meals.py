@@ -11,10 +11,10 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.auth.deps import CurrentUserId, SessionDep, require_csrf
+from app.auth.deps import CurrentUserId, SessionDep, require_write
 from app.db.models import Meal
 
 router = APIRouter(tags=["Meals"])
@@ -142,7 +142,7 @@ async def create_meal(
     body: MealCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> dict[str, Any]:
-    require_csrf(request)
+    require_write(request, user_id)
     try:
         key = uuid.UUID(idempotency_key)
     except ValueError as exc:
@@ -160,6 +160,19 @@ async def create_meal(
             raise HTTPException(status_code=409, detail="This key was used for a different meal.")
         response.status_code = 200
         return _meal_out(existing)
+
+    cap = request.app.state.settings.meals_per_day
+    created_today = (
+        await session.execute(
+            select(func.count())
+            .select_from(Meal)
+            .where(
+                Meal.user_id == user_id, Meal.created_at >= datetime.now(UTC) - timedelta(days=1)
+            )
+        )
+    ).scalar_one()
+    if created_today >= cap:
+        raise HTTPException(status_code=429, detail="Daily meal limit reached. Try again tomorrow.")
 
     meal = Meal(
         user_id=user_id,
@@ -204,7 +217,7 @@ async def update_meal(
     body: MealPatch,
     if_match: Annotated[str, Header(alias="If-Match")],
 ) -> dict[str, Any]:
-    require_csrf(request)
+    require_write(request, user_id)
     meal = await _owned(session, user_id, meal_id)
     expected = if_match.strip().strip('"')
     if not expected.isdigit() or int(expected) != meal.version:
@@ -225,7 +238,7 @@ async def delete_meal(
     user_id: CurrentUserId,
     session: SessionDep,
 ) -> None:
-    require_csrf(request)
+    require_write(request, user_id)
     meal = await _owned(session, user_id, meal_id)
     await session.delete(meal)
     await session.commit()

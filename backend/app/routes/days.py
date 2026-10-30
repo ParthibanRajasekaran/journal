@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from sqlalchemy import select
 
 from app.auth.deps import CurrentUserId, SessionDep
@@ -34,6 +34,16 @@ def _totals(day: date, meals: list[Meal]) -> dict[str, Any]:
     }
 
 
+MIN_DAY = date(1900, 1, 1)
+MAX_DAY = date(2999, 12, 31)
+
+
+def _check_range(day: date) -> None:
+    """Dates outside a sensible range are refused, so day arithmetic cannot overflow."""
+    if not MIN_DAY <= day <= MAX_DAY:
+        raise HTTPException(status_code=422, detail="Date must be between 1900 and 2999.")
+
+
 def _bounds(first: date, last: date) -> tuple[datetime, datetime]:
     lower = datetime.combine(first, time.min, tzinfo=UTC)
     upper = datetime.combine(last + timedelta(days=1), time.min, tzinfo=UTC)
@@ -46,6 +56,7 @@ async def get_day(
     user_id: CurrentUserId,
     session: SessionDep,
 ) -> dict[str, Any]:
+    _check_range(day)
     lower, upper = _bounds(day, day)
     meals = (
         (
@@ -74,6 +85,7 @@ async def get_week(
     session: SessionDep,
     start: Annotated[date, Query()],
 ) -> list[dict[str, Any]]:
+    _check_range(start)
     days = [start + timedelta(days=offset) for offset in range(7)]
     lower, upper = _bounds(days[0], days[-1])
     meals = (

@@ -121,3 +121,47 @@ def test_deleting_the_account_removes_meals_and_ends_the_session(
 
     _sign_in_as(client, monkeypatch, "owner-a")
     assert client.get("/api/v1/meals").json()["items"] == []
+
+
+def test_write_burst_is_limited_per_user(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    limited = settings.model_copy(update={"write_requests_per_minute": 3})
+    application = create_app(limited)
+    application.state.jwks = FakeKeys()
+    with TestClient(application, follow_redirects=False) as client:
+        _sign_in_as(client, monkeypatch, "burst-user")
+        statuses = [
+            client.patch("/api/v1/me", json={"display_name": "x"}, headers=CSRF).status_code
+            for _ in range(5)
+        ]
+    assert statuses[:3] == [200, 200, 200]
+    assert statuses[3:] == [429, 429]
+
+
+def test_daily_meal_cap_refuses_new_meals_but_not_replays(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    capped = settings.model_copy(update={"meals_per_day": 2, "write_requests_per_minute": 1000})
+    application = create_app(capped)
+    application.state.jwks = FakeKeys()
+    with TestClient(application, follow_redirects=False) as client:
+        _sign_in_as(client, monkeypatch, "capped-user")
+        first = _meal_body()
+        assert _create(client, first).status_code == 201
+        assert _create(client, _meal_body()).status_code == 201
+        assert _create(client, _meal_body()).status_code == 429
+        assert _create(client, first).status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/api/v1/days/9999-12-31", "/api/v1/days/0001-01-01"])
+def test_extreme_dates_are_refused_not_crashed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    assert client.get(path).status_code == 422
+
+
+def test_extreme_week_start_is_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    assert client.get("/api/v1/week", params={"start": "9999-12-31"}).status_code == 422

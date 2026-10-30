@@ -1,6 +1,11 @@
 journal.getrendercheck.com {
 	encode zstd gzip
 
+	# Refuse oversized bodies before they reach the API. Photo uploads get their own limit later.
+	request_body {
+		max_size 64KB
+	}
+
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
