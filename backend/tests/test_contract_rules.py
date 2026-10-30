@@ -22,6 +22,7 @@ PUBLIC_OPERATIONS = {
     ("/auth/google/callback", "get"),
     ("/auth/refresh", "post"),
     ("/health", "get"),
+    ("/health/ready", "get"),
 }
 
 

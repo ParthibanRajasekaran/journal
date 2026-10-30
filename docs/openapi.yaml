@@ -3,175 +3,218 @@ info:
   title: Journal API
   version: 1.0.0-draft
   summary: Meal logging API for the Journal app (MVP).
-  description: |
-    Draft contract for ADR-001. Field names for estimates follow ADR-001 and are
+  description: 'Draft contract for ADR-001. Field names for estimates follow ADR-001 and are
+
     pending the schema decision in docs/progress.md (open decision 2).
+
     Every non-public operation requires a Bearer access token. Errors use
+
     RFC 9457 problem details. Writes accept an Idempotency-Key header.
+
+    '
   license:
     name: Proprietary (to be decided)
 servers:
-  - url: https://api.journal.example/api/v1
-    description: Placeholder production URL
+- url: https://api.journal.example/api/v1
+  description: Placeholder production URL
 security:
-  - bearerAuth: []
-  - cookieAuth: []
+- bearerAuth: []
+- cookieAuth: []
 tags:
-  - name: Auth
-  - name: Me
-  - name: Photos
-  - name: Estimates
-  - name: Meals
-  - name: Days
-  - name: Sync
-  - name: Health
-
+- name: Auth
+- name: Me
+- name: Photos
+- name: Estimates
+- name: Meals
+- name: Days
+- name: Sync
+- name: Health
 paths:
   /auth/google/start:
     get:
-      tags: [Auth]
+      tags:
+      - Auth
       operationId: startGoogleSignIn
       summary: Redirect the browser to Google to sign in
-      description: |
-        Sets a short-lived, HttpOnly state cookie holding state, nonce, and the PKCE
+      description: 'Sets a short-lived, HttpOnly state cookie holding state, nonce, and the PKCE
+
         verifier. The client secret stays on the server (ADR-004).
+
+        '
       security: []
       responses:
         '302':
           description: Redirect to Google's consent screen
           headers:
             Location:
-              schema: { type: string, format: uri }
-        '503': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                type: string
+                format: uri
+        '503':
+          $ref: '#/components/responses/Problem'
   /auth/google/callback:
     get:
-      tags: [Auth]
+      tags:
+      - Auth
       operationId: googleCallback
       summary: Google returns here after consent
-      description: |
-        Checks state against the cookie, exchanges the code, verifies the ID token
+      description: 'Checks state against the cookie, exchanges the code, verifies the ID token
+
         (signature, issuer, audience, expiry, nonce, verified email), creates the
+
         account on first sign-in, and sets HttpOnly session cookies.
+
+        '
       security: []
       parameters:
-        - name: code
-          in: query
-          required: false
-          schema: { type: string, maxLength: 2048 }
-        - name: state
-          in: query
-          required: false
-          schema: { type: string, maxLength: 256 }
-        - name: error
-          in: query
-          required: false
-          schema: { type: string, maxLength: 128 }
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 2048
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 256
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 128
       responses:
         '303':
           description: Signed in; cookies set. Redirects to /api/v1/me.
           headers:
             Location:
-              schema: { type: string }
-        '400': { $ref: '#/components/responses/Problem' }
-        '401': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-        '503': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
   /auth/refresh:
     post:
-      tags: [Auth]
+      tags:
+      - Auth
       operationId: refreshSession
       summary: Rotate the refresh cookie and issue a new access cookie
-      description: |
-        Reads the HttpOnly refresh cookie. Each token is single use. Presenting a
+      description: 'Reads the HttpOnly refresh cookie. Each token is single use. Presenting a
+
         used token revokes the whole family. Requires the X-Journal-Request header.
+
+        '
       security: []
       parameters:
-        - $ref: '#/components/parameters/JournalRequest'
+      - $ref: '#/components/parameters/JournalRequest'
       responses:
         '204':
           description: New cookies set
-        '401': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /auth/logout:
     post:
-      tags: [Auth]
+      tags:
+      - Auth
       operationId: logout
       summary: End the session and revoke its refresh family
       parameters:
-        - $ref: '#/components/parameters/JournalRequest'
+      - $ref: '#/components/parameters/JournalRequest'
       responses:
         '204':
           description: Signed out; cookies cleared
-        '401': { $ref: '#/components/responses/Problem' }
-        '403': { $ref: '#/components/responses/Problem' }
-
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /me:
     get:
-      tags: [Me]
+      tags:
+      - Me
       operationId: getMe
       responses:
         '200':
           description: Current profile
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Profile' }
-        '401': { $ref: '#/components/responses/Problem' }
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Problem'
     patch:
-      tags: [Me]
+      tags:
+      - Me
       operationId: updateMe
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ProfilePatch' }
+            schema:
+              $ref: '#/components/schemas/ProfilePatch'
       responses:
         '200':
           description: Updated profile
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Profile' }
-        '422': { $ref: '#/components/responses/Problem' }
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '422':
+          $ref: '#/components/responses/Problem'
     delete:
-      tags: [Me]
+      tags:
+      - Me
       operationId: deleteAccount
       summary: Delete the account, meals, photos, consents, and keys
       responses:
-        '204': { description: Deleted }
-
+        '204':
+          description: Deleted
   /me/ai-provider:
     get:
-      tags: [Me]
+      tags:
+      - Me
       operationId: getAiProvider
       responses:
         '200':
           description: Selected provider
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AiProviderSetting' }
+              schema:
+                $ref: '#/components/schemas/AiProviderSetting'
     put:
-      tags: [Me]
+      tags:
+      - Me
       operationId: setAiProvider
       description: Requires an active consent for the chosen provider (see /me/consents).
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/AiProviderSetting' }
+            schema:
+              $ref: '#/components/schemas/AiProviderSetting'
       responses:
         '200':
           description: Provider set
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AiProviderSetting' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/AiProviderSetting'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /me/consents:
     get:
-      tags: [Me]
+      tags:
+      - Me
       operationId: listConsents
       responses:
         '200':
@@ -180,171 +223,181 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Consent' }
+                items:
+                  $ref: '#/components/schemas/Consent'
     post:
-      tags: [Me]
+      tags:
+      - Me
       operationId: grantConsent
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ConsentGrant' }
+            schema:
+              $ref: '#/components/schemas/ConsentGrant'
       responses:
         '201':
           description: Consent recorded
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Consent' }
-        '422': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/Consent'
+        '422':
+          $ref: '#/components/responses/Problem'
   /photos:
     post:
-      tags: [Photos]
+      tags:
+      - Photos
       operationId: uploadPhoto
       summary: Upload a meal photo; returns only after the bytes are durably stored
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           image/jpeg:
-            schema: { type: string, format: binary, maxLength: 10485760 }
+            schema:
+              type: string
+              format: binary
+              maxLength: 10485760
           image/png:
-            schema: { type: string, format: binary, maxLength: 10485760 }
+            schema:
+              type: string
+              format: binary
+              maxLength: 10485760
       responses:
         '201':
           description: Stored
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Photo' }
-        '413': { $ref: '#/components/responses/Problem' }
-        '415': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/Photo'
+        '413':
+          $ref: '#/components/responses/Problem'
+        '415':
+          $ref: '#/components/responses/Problem'
   /estimates:
     post:
-      tags: [Estimates]
+      tags:
+      - Estimates
       operationId: createEstimate
       summary: Estimate nutrition from a photo or text. Saves nothing.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/EstimateRequest' }
+            schema:
+              $ref: '#/components/schemas/EstimateRequest'
       responses:
         '200':
           description: Validated estimate
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EstimateResponse' }
-        '403': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-        '429': { $ref: '#/components/responses/Problem' }
-        '503': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/EstimateResponse'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
   /meals:
     get:
-      tags: [Meals]
+      tags:
+      - Meals
       operationId: listMeals
       parameters:
-        - name: date
-          in: query
-          schema: { type: string, format: date }
-        - name: from
-          in: query
-          schema: { type: string, format: date }
-        - name: to
-          in: query
-          schema: { type: string, format: date }
-        - name: cursor
-          in: query
-          schema: { type: string }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      - name: date
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
       responses:
         '200':
           description: Page of meals owned by the caller
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MealPage' }
+              schema:
+                $ref: '#/components/schemas/MealPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
     post:
-      tags: [Meals]
+      tags:
+      - Meals
       operationId: createMeal
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - &id001
+        $ref: '#/components/parameters/JournalRequest'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/MealCreate' }
+            schema:
+              $ref: '#/components/schemas/MealCreate'
       responses:
         '201':
           description: Created
           headers:
             Location:
-              schema: { type: string }
+              schema:
+                type: string
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Meal' }
+              schema:
+                $ref: '#/components/schemas/Meal'
         '200':
           description: Replayed; the same key and body returned the existing meal
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Meal' }
-        '409': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-
-  /meals/{mealId}:
-    parameters:
-      - $ref: '#/components/parameters/MealId'
-    get:
-      tags: [Meals]
-      operationId: getMeal
-      responses:
-        '200':
-          description: Meal
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Meal' }
-        '404': { $ref: '#/components/responses/Problem' }
-    patch:
-      tags: [Meals]
-      operationId: updateMeal
-      description: Requires If-Match with the current version.
-      parameters:
-        - name: If-Match
-          in: header
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/MealPatch' }
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Meal' }
-        '404': { $ref: '#/components/responses/Problem' }
-        '412': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-    delete:
-      tags: [Meals]
-      operationId: deleteMeal
-      responses:
-        '204': { description: Deleted }
-        '404': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
   /days/{date}:
     parameters:
-      - name: date
-        in: path
-        required: true
-        schema: { type: string, format: date }
+    - name: date
+      in: path
+      required: true
+      schema:
+        type: string
+        format: date
     get:
-      tags: [Days]
+      tags:
+      - Days
       operationId: getDay
       summary: Totals and meals for one day
       responses:
@@ -352,17 +405,20 @@ paths:
           description: Day summary
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/DaySummary' }
-
+              schema:
+                $ref: '#/components/schemas/DaySummary'
   /week:
     get:
-      tags: [Days]
+      tags:
+      - Days
       operationId: getWeek
       parameters:
-        - name: start
-          in: query
-          required: true
-          schema: { type: string, format: date }
+      - name: start
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
       responses:
         '200':
           description: Seven daily totals
@@ -372,30 +428,35 @@ paths:
                 type: array
                 minItems: 7
                 maxItems: 7
-                items: { $ref: '#/components/schemas/DayTotals' }
-
+                items:
+                  $ref: '#/components/schemas/DayTotals'
   /sync:
     post:
-      tags: [Sync]
+      tags:
+      - Sync
       operationId: syncBatch
       summary: Apply a batch of queued writes; per-item results
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/SyncBatch' }
+            schema:
+              $ref: '#/components/schemas/SyncBatch'
       responses:
         '200':
           description: Per-item results
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SyncResult' }
-        '413': { $ref: '#/components/responses/Problem' }
-        '422': { $ref: '#/components/responses/Problem' }
-
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '413':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /health:
     get:
-      tags: [Health]
+      tags:
+      - Health
       operationId: getHealth
       security: []
       responses:
@@ -405,11 +466,112 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status]
+                required:
+                - status
                 properties:
-                  status: { type: string, enum: [ok] }
+                  status:
+                    type: string
+                    enum:
+                    - ok
                 additionalProperties: false
-
+  /health/ready:
+    get:
+      tags:
+      - Health
+      operationId: getReadiness
+      security: []
+      summary: 'Readiness: checks the database can answer'
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - ready
+                additionalProperties: false
+        '503':
+          $ref: '#/components/responses/Problem'
+  /meals/{meal_id}:
+    parameters:
+    - $ref: '#/components/parameters/MealId'
+    get:
+      tags:
+      - Meals
+      operationId: getMeal
+      responses:
+        '200':
+          description: Meal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+    patch:
+      tags:
+      - Meals
+      operationId: updateMeal
+      description: Requires If-Match with the current version.
+      parameters:
+      - *id001
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPatch'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags:
+      - Meals
+      operationId: deleteMeal
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id001
 components:
   securitySchemes:
     bearerAuth:
@@ -422,250 +584,507 @@ components:
       in: cookie
       name: journal_access
       description: Set by sign-in for the web client. HttpOnly, SameSite=Strict.
-
   parameters:
     JournalRequest:
       name: X-Journal-Request
       in: header
       required: true
       description: CSRF guard. Cross-site forms cannot set custom headers, and no CORS grant is made.
-      schema: { type: string, enum: ['1'] }
+      schema:
+        type: string
+        enum:
+        - '1'
     IdempotencyKey:
       name: Idempotency-Key
       in: header
       required: true
       description: Client-generated UUIDv4. Same key with a different body returns 422.
-      schema: { type: string, format: uuid }
+      schema:
+        type: string
+        format: uuid
     MealId:
-      name: mealId
+      name: meal_id
       in: path
       required: true
-      schema: { type: string, pattern: '^meal_[0-9A-Za-z]+$' }
-
+      schema:
+        type: string
+        pattern: ^meal_[0-9A-Za-z]+$
   responses:
     Problem:
       description: Error (RFC 9457)
       content:
         application/problem+json:
-          schema: { $ref: '#/components/schemas/Problem' }
-
+          schema:
+            $ref: '#/components/schemas/Problem'
   schemas:
     Problem:
       type: object
-      required: [type, title, status]
+      required:
+      - type
+      - title
+      - status
       properties:
-        type: { type: string, format: uri-reference }
-        title: { type: string }
-        status: { type: integer }
-        detail: { type: string }
-        instance: { type: string }
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
         errors:
           type: array
           items:
             type: object
-            required: [field, message]
+            required:
+            - field
+            - message
             properties:
-              field: { type: string }
-              message: { type: string }
-
+              field:
+                type: string
+              message:
+                type: string
     Profile:
       type: object
-      required: [id, email, daily_targets]
+      required:
+      - id
+      - email
+      - daily_targets
       properties:
-        id: { type: string }
-        email: { type: string, format: email }
-        display_name: { type: string, maxLength: 80 }
-        daily_targets: { $ref: '#/components/schemas/DailyTargets' }
-
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+          maxLength: 80
+        daily_targets:
+          $ref: '#/components/schemas/DailyTargets'
     ProfilePatch:
       type: object
       properties:
-        display_name: { type: string, maxLength: 80 }
-        daily_targets: { $ref: '#/components/schemas/DailyTargets' }
+        display_name:
+          type: string
+          maxLength: 80
+        daily_targets:
+          $ref: '#/components/schemas/DailyTargets'
       additionalProperties: false
-
     DailyTargets:
       type: object
       properties:
-        calories: { type: number, minimum: 800, maximum: 6000 }
-        protein_g: { type: number, minimum: 0, maximum: 400 }
-
+        calories:
+          type: number
+          minimum: 800
+          maximum: 6000
+        protein_g:
+          type: number
+          minimum: 0
+          maximum: 400
     AiProviderSetting:
       type: object
-      required: [provider]
+      required:
+      - provider
       properties:
-        provider: { type: string, enum: [gemini, openai, anthropic] }
-        use_own_key: { type: boolean, default: false }
+        provider:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - anthropic
+        use_own_key:
+          type: boolean
+          default: false
       additionalProperties: false
-
     Consent:
       type: object
-      required: [provider, terms_version, granted_at]
+      required:
+      - provider
+      - terms_version
+      - granted_at
       properties:
-        provider: { type: string, enum: [gemini, openai, anthropic] }
-        terms_version: { type: string }
-        granted_at: { type: string, format: date-time }
-        revoked_at: { type: [string, 'null'], format: date-time }
-
+        provider:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - anthropic
+        terms_version:
+          type: string
+        granted_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
     ConsentGrant:
       type: object
-      required: [provider, terms_version, acknowledged]
+      required:
+      - provider
+      - terms_version
+      - acknowledged
       properties:
-        provider: { type: string, enum: [gemini, openai, anthropic] }
-        terms_version: { type: string }
-        acknowledged: { type: boolean, const: true }
-        acknowledged_training: { type: boolean, description: Required for Gemini free tier (ADR-006) }
+        provider:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - anthropic
+        terms_version:
+          type: string
+        acknowledged:
+          type: boolean
+          const: true
+        acknowledged_training:
+          type: boolean
+          description: Required for Gemini free tier (ADR-006)
       additionalProperties: false
-
     Photo:
       type: object
-      required: [photo_id, sha256, created_at]
+      required:
+      - photo_id
+      - sha256
+      - created_at
       properties:
-        photo_id: { type: string, pattern: '^ph_[0-9A-Za-z]+$' }
-        sha256: { type: string, pattern: '^[a-f0-9]{64}$' }
-        created_at: { type: string, format: date-time }
-
+        photo_id:
+          type: string
+          pattern: ^ph_[0-9A-Za-z]+$
+        sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        created_at:
+          type: string
+          format: date-time
     EstimateRequest:
       type: object
       oneOf:
-        - required: [photo_id]
-        - required: [text]
+      - required:
+        - photo_id
+      - required:
+        - text
       properties:
-        photo_id: { type: string, pattern: '^ph_[0-9A-Za-z]+$' }
-        text: { type: string, minLength: 1, maxLength: 1000 }
+        photo_id:
+          type: string
+          pattern: ^ph_[0-9A-Za-z]+$
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
       additionalProperties: false
-
     EstimateResponse:
       type: object
-      required: [estimate_id, provider, estimate]
+      required:
+      - estimate_id
+      - provider
+      - estimate
       properties:
-        estimate_id: { type: string }
-        provider: { type: string, enum: [gemini, openai, anthropic] }
-        estimate: { $ref: '#/components/schemas/NutritionEstimate' }
-
+        estimate_id:
+          type: string
+        provider:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - anthropic
+        estimate:
+          $ref: '#/components/schemas/NutritionEstimate'
     NutritionEstimate:
-      description: >-
-        Field names follow ADR-001. Pending decision 2 in docs/progress.md:
-        ADR-005 proposes calories_kcal and a low|medium|high confidence.
-        Adding is_food is required by ADR-006.
+      description: 'Field names follow ADR-001. Pending decision 2 in docs/progress.md: ADR-005 proposes calories_kcal and a low|medium|high confidence. Adding is_food is required by ADR-006.'
       type: object
-      required: [name, meal_type, calories, protein_g, carbs_g, fat_g, confidence]
+      required:
+      - name
+      - meal_type
+      - calories
+      - protein_g
+      - carbs_g
+      - fat_g
+      - confidence
       properties:
-        name: { type: string, maxLength: 120 }
-        meal_type: { type: string, enum: [breakfast, lunch, dinner, snack] }
-        calories: { type: number, minimum: 0, maximum: 5000 }
-        protein_g: { type: number, minimum: 0, maximum: 300 }
-        carbs_g: { type: number, minimum: 0, maximum: 500 }
-        fat_g: { type: number, minimum: 0, maximum: 300 }
-        confidence: { type: number, minimum: 0, maximum: 1 }
+        name:
+          type: string
+          maxLength: 120
+        meal_type:
+          type: string
+          enum:
+          - breakfast
+          - lunch
+          - dinner
+          - snack
+        calories:
+          type: number
+          minimum: 0
+          maximum: 5000
+        protein_g:
+          type: number
+          minimum: 0
+          maximum: 300
+        carbs_g:
+          type: number
+          minimum: 0
+          maximum: 500
+        fat_g:
+          type: number
+          minimum: 0
+          maximum: 300
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
       additionalProperties: false
-
     MealCreate:
       type: object
-      required: [client_id, meal_type, eaten_at, name, calories, protein_g, carbs_g, fat_g, source]
+      required:
+      - client_id
+      - meal_type
+      - eaten_at
+      - name
+      - calories
+      - protein_g
+      - carbs_g
+      - fat_g
+      - source
       properties:
-        client_id: { type: string, format: uuid }
-        meal_type: { type: string, enum: [breakfast, lunch, dinner, snack] }
-        eaten_at: { type: string, format: date-time }
-        name: { type: string, minLength: 1, maxLength: 120 }
-        calories: { type: number, minimum: 0, maximum: 5000 }
-        protein_g: { type: number, minimum: 0, maximum: 300 }
-        carbs_g: { type: number, minimum: 0, maximum: 500 }
-        fat_g: { type: number, minimum: 0, maximum: 300 }
-        photo_id: { type: string, pattern: '^ph_[0-9A-Za-z]+$' }
-        source: { type: string, enum: [ai_confirmed, ai_edited, manual] }
+        client_id:
+          type: string
+          format: uuid
+        meal_type:
+          type: string
+          enum:
+          - breakfast
+          - lunch
+          - dinner
+          - snack
+        eaten_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        calories:
+          type: number
+          minimum: 0
+          maximum: 5000
+        protein_g:
+          type: number
+          minimum: 0
+          maximum: 300
+        carbs_g:
+          type: number
+          minimum: 0
+          maximum: 500
+        fat_g:
+          type: number
+          minimum: 0
+          maximum: 300
+        photo_id:
+          type: string
+          pattern: ^ph_[0-9A-Za-z]+$
+        source:
+          type: string
+          enum:
+          - ai_confirmed
+          - ai_edited
+          - manual
       additionalProperties: false
-
     MealPatch:
       type: object
       minProperties: 1
       properties:
-        meal_type: { type: string, enum: [breakfast, lunch, dinner, snack] }
-        eaten_at: { type: string, format: date-time }
-        name: { type: string, minLength: 1, maxLength: 120 }
-        calories: { type: number, minimum: 0, maximum: 5000 }
-        protein_g: { type: number, minimum: 0, maximum: 300 }
-        carbs_g: { type: number, minimum: 0, maximum: 500 }
-        fat_g: { type: number, minimum: 0, maximum: 300 }
+        meal_type:
+          type: string
+          enum:
+          - breakfast
+          - lunch
+          - dinner
+          - snack
+        eaten_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        calories:
+          type: number
+          minimum: 0
+          maximum: 5000
+        protein_g:
+          type: number
+          minimum: 0
+          maximum: 300
+        carbs_g:
+          type: number
+          minimum: 0
+          maximum: 500
+        fat_g:
+          type: number
+          minimum: 0
+          maximum: 300
       additionalProperties: false
-
     Meal:
       type: object
-      required: [id, client_id, meal_type, eaten_at, name, calories, protein_g, carbs_g, fat_g, source, version, created_at]
+      required:
+      - id
+      - client_id
+      - meal_type
+      - eaten_at
+      - name
+      - calories
+      - protein_g
+      - carbs_g
+      - fat_g
+      - source
+      - version
+      - created_at
       properties:
-        id: { type: string, pattern: '^meal_[0-9A-Za-z]+$' }
-        client_id: { type: string, format: uuid }
-        meal_type: { type: string, enum: [breakfast, lunch, dinner, snack] }
-        eaten_at: { type: string, format: date-time }
-        name: { type: string }
-        calories: { type: number }
-        protein_g: { type: number }
-        carbs_g: { type: number }
-        fat_g: { type: number }
-        photo_id: { type: [string, 'null'] }
-        source: { type: string, enum: [ai_confirmed, ai_edited, manual] }
-        version: { type: integer, minimum: 1 }
-        created_at: { type: string, format: date-time }
-
+        id:
+          type: string
+          pattern: ^meal_[0-9A-Za-z]+$
+        client_id:
+          type: string
+          format: uuid
+        meal_type:
+          type: string
+          enum:
+          - breakfast
+          - lunch
+          - dinner
+          - snack
+        eaten_at:
+          type: string
+          format: date-time
+        name:
+          type: string
+        calories:
+          type: number
+        protein_g:
+          type: number
+        carbs_g:
+          type: number
+        fat_g:
+          type: number
+        photo_id:
+          type:
+          - string
+          - 'null'
+        source:
+          type: string
+          enum:
+          - ai_confirmed
+          - ai_edited
+          - manual
+        version:
+          type: integer
+          minimum: 1
+        created_at:
+          type: string
+          format: date-time
     MealPage:
       type: object
-      required: [items]
+      required:
+      - items
       properties:
         items:
           type: array
-          items: { $ref: '#/components/schemas/Meal' }
-        next_cursor: { type: [string, 'null'] }
-
+          items:
+            $ref: '#/components/schemas/Meal'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     DayTotals:
       type: object
-      required: [date, calories, protein_g, carbs_g, fat_g, meal_count]
+      required:
+      - date
+      - calories
+      - protein_g
+      - carbs_g
+      - fat_g
+      - meal_count
       properties:
-        date: { type: string, format: date }
-        calories: { type: number }
-        protein_g: { type: number }
-        carbs_g: { type: number }
-        fat_g: { type: number }
-        meal_count: { type: integer, minimum: 0 }
-
+        date:
+          type: string
+          format: date
+        calories:
+          type: number
+        protein_g:
+          type: number
+        carbs_g:
+          type: number
+        fat_g:
+          type: number
+        meal_count:
+          type: integer
+          minimum: 0
     DaySummary:
       allOf:
-        - $ref: '#/components/schemas/DayTotals'
-        - type: object
-          required: [meals, targets]
-          properties:
-            meals:
-              type: array
-              items: { $ref: '#/components/schemas/Meal' }
-            targets: { $ref: '#/components/schemas/DailyTargets' }
-
+      - $ref: '#/components/schemas/DayTotals'
+      - type: object
+        required:
+        - meals
+        - targets
+        properties:
+          meals:
+            type: array
+            items:
+              $ref: '#/components/schemas/Meal'
+          targets:
+            $ref: '#/components/schemas/DailyTargets'
     SyncBatch:
       type: object
-      required: [items]
+      required:
+      - items
       properties:
         items:
           type: array
           maxItems: 100
           items:
             type: object
-            required: [idempotency_key, method, path, body]
+            required:
+            - idempotency_key
+            - method
+            - path
+            - body
             properties:
-              idempotency_key: { type: string, format: uuid }
-              method: { type: string, enum: [POST, PATCH, DELETE] }
-              path: { type: string, pattern: '^/(meals|photos)' }
-              body: { type: object }
+              idempotency_key:
+                type: string
+                format: uuid
+              method:
+                type: string
+                enum:
+                - POST
+                - PATCH
+                - DELETE
+              path:
+                type: string
+                pattern: ^/(meals|photos)
+              body:
+                type: object
             additionalProperties: false
       additionalProperties: false
-
     SyncResult:
       type: object
-      required: [results]
+      required:
+      - results
       properties:
         results:
           type: array
           items:
             type: object
-            required: [idempotency_key, status]
+            required:
+            - idempotency_key
+            - status
             properties:
-              idempotency_key: { type: string, format: uuid }
-              status: { type: integer }
-              problem: { $ref: '#/components/schemas/Problem' }
+              idempotency_key:
+                type: string
+                format: uuid
+              status:
+                type: integer
+              problem:
+                $ref: '#/components/schemas/Problem'

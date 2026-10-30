@@ -6,6 +6,8 @@ anonymous request and expects a refusal. Adding a route therefore forces a revie
 decision: public (listed in the contract's public set) or protected (listed here).
 """
 
+import uuid
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -17,6 +19,11 @@ PUBLIC_API_ROUTES = {(f"{API_PREFIX}{path}", method) for path, method in PUBLIC_
 PROTECTED_API_ROUTES = {
     (f"{API_PREFIX}/me", "get"),
     (f"{API_PREFIX}/auth/logout", "post"),
+    (f"{API_PREFIX}/meals", "get"),
+    (f"{API_PREFIX}/meals", "post"),
+    (f"{API_PREFIX}/meals/{{meal_id}}", "get"),
+    (f"{API_PREFIX}/meals/{{meal_id}}", "patch"),
+    (f"{API_PREFIX}/meals/{{meal_id}}", "delete"),
 }
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
@@ -52,7 +59,19 @@ def test_protected_routes_are_all_exposed(app: FastAPI) -> None:
 def test_protected_route_refuses_anonymous_callers(
     client: TestClient, path: str, method: str
 ) -> None:
-    headers = {"X-Journal-Request": "1"}
-    response = client.request(method.upper(), path, headers=headers)
+    headers = {"X-Journal-Request": "1", "Idempotency-Key": str(uuid.uuid4()), "If-Match": "1"}
+    concrete = path.replace("{meal_id}", "meal_does_not_exist")
+    body = {
+        "client_id": str(uuid.uuid4()),
+        "meal_type": "lunch",
+        "eaten_at": "2026-10-29T12:00:00Z",
+        "name": "Soup",
+        "calories": 200,
+        "protein_g": 10,
+        "carbs_g": 20,
+        "fat_g": 5,
+        "source": "manual",
+    }
+    response = client.request(method.upper(), concrete, headers=headers, json=body)
     assert response.status_code == 401
     assert response.headers["content-type"].startswith("application/problem+json")
