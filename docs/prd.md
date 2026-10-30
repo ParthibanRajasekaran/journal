@@ -10,7 +10,7 @@ Most nutrition apps ask people to log too much, too often, and show them numbers
 
 ## 2. Users and jobs
 
-- **Primary user:** an adult tracking their own meals for general health. Uses the phone for logging and a browser for review.
+- **Primary user:** an adult aged 18 or over tracking their own meals for general health. Uses the phone for logging and a browser for review. MVP access is 18+ only; 16 to 17 year olds are not admitted until a separate, reviewed plan exists (see `docs/research/teen-access-competitors.md`).
 - **Job 1:** log a meal quickly from a photo, a text description, or a voice note.
 - **Job 2:** see today's totals against a daily target.
 - **Job 3:** review the past week and correct mistakes.

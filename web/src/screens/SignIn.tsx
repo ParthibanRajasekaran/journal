@@ -5,6 +5,7 @@ import { api } from "../api";
 export function SignIn() {
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [adult, setAdult] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -33,11 +34,20 @@ export function SignIn() {
           <li>Delete everything, any time, from Settings.</li>
         </ul>
 
+        <label className="adult-check">
+          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} />
+          <span>I am 18 or older.</span>
+        </label>
+
         <a
-          className="google-btn"
-          href={api.signInUrl}
+          className={`google-btn ${adult ? "" : "is-disabled"}`}
+          href={adult ? api.signInUrl : undefined}
+          aria-disabled={!adult}
           aria-busy={busy}
-          onClick={() => setBusy(true)}
+          onClick={(e) => {
+            if (!adult) return e.preventDefault();
+            setBusy(true);
+          }}
         >
           <GoogleMark />
           <span>{busy ? "Redirecting…" : "Continue with Google"}</span>

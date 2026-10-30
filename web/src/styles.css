@@ -399,3 +399,8 @@ fieldset.question legend { font-weight: 600; padding: 0 6px; }
 .hourglass { color: var(--accent); flex: none; animation: hourglass-turn 2.4s var(--ease) infinite; transform-origin: 50% 50%; }
 @keyframes hourglass-turn { 0%, 40% { transform: rotate(0deg); } 50%, 90% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
 .saved-note .check { font-size: 15px; background: transparent; color: inherit; }
+
+/* Sign-in: the 18+ confirmation for the MVP */
+.adult-check { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 15px; cursor: pointer; }
+.adult-check input[type="checkbox"] { width: 20px; height: 20px; min-width: 20px; margin: 0; }
+.google-btn.is-disabled { opacity: 0.45; pointer-events: none; }
