@@ -111,6 +111,15 @@ def test_profile_targets_are_saved_and_validated(
     )
 
 
+def test_drinks_and_other_intake_can_be_logged_as_their_own_meal(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    response = _create(client, _meal_body(meal_type="other", name="Green tea"))
+    assert response.status_code == 201
+    assert response.json()["meal_type"] == "other"
+
+
 def test_buddy_encouragement_is_on_by_default_and_can_be_switched_off(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

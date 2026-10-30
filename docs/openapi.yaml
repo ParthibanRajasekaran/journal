@@ -1028,6 +1028,7 @@ components:
           - lunch
           - dinner
           - snack
+          - other
         eaten_at:
           type: string
           format: date-time
@@ -1072,6 +1073,7 @@ components:
           - lunch
           - dinner
           - snack
+          - other
         eaten_at:
           type: string
           format: date-time
@@ -1125,6 +1127,7 @@ components:
           - lunch
           - dinner
           - snack
+          - other
         eaten_at:
           type: string
           format: date-time

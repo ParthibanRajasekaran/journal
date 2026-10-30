@@ -5,7 +5,7 @@ import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 import { savedLine } from "../encouragement";
 
-const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack"];
+const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack", "other"];
 
 interface Props {
   day: string;
@@ -90,7 +90,7 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
                 const meals = summary.meals.filter((m) => m.meal_type === type);
                 return (
                   <div key={type}>
-                    <h2>{type}</h2>
+                    <h2>{type === "other" ? "drinks and other" : type}</h2>
                     {meals.length === 0 ? (
                       <p className="muted" style={{ margin: "0 0 8px" }}>Nothing logged yet.</p>
                     ) : (

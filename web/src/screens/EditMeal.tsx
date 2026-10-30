@@ -97,6 +97,7 @@ export function EditMeal({ meal, onCancel, onSaved, onStale }: Props) {
             <option value="lunch">Lunch</option>
             <option value="dinner">Dinner</option>
             <option value="snack">Snack</option>
+            <option value="other">Drinks and other</option>
           </select>
         </div>
         <div>

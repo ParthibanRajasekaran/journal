@@ -19,7 +19,7 @@ from app.db.models import Meal
 
 router = APIRouter(tags=["Meals"])
 
-MealType = Literal["breakfast", "lunch", "dinner", "snack"]
+MealType = Literal["breakfast", "lunch", "dinner", "snack", "other"]
 MealSource = Literal["ai_confirmed", "ai_edited", "manual"]
 PHOTO_ID_PATTERN = r"^ph_[0-9A-Za-z]+$"
 MAX_PAGE = 200

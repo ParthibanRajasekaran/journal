@@ -1,7 +1,7 @@
 import { Meal } from "../api";
 
 // The time a meal gets when the user picks it and the current time is outside its window.
-const DEFAULT_TIME: Record<Meal["meal_type"], string> = {
+const DEFAULT_TIME: Record<Exclude<Meal["meal_type"], "other">, string> = {
   breakfast: "08:00",
   lunch: "13:00",
   snack: "16:30",
@@ -13,6 +13,7 @@ const MEALS: { type: Meal["meal_type"]; label: string }[] = [
   { type: "lunch", label: "Lunch" },
   { type: "snack", label: "Snack" },
   { type: "dinner", label: "Dinner" },
+  { type: "other", label: "Other" },
 ];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -35,7 +36,9 @@ export function mealFor(time: string): Meal["meal_type"] {
 
 // Time is the single source of truth. Picking a meal keeps the time if it already falls in that
 // meal's window, so a choice never overwrites a time the user just typed.
+// Drinks and other intake keep whatever time the user set, since they are not tied to a meal time.
 export function timeFor(meal: Meal["meal_type"], current: string): string {
+  if (meal === "other") return current;
   return mealFor(current) === meal ? current : DEFAULT_TIME[meal];
 }
 
@@ -56,7 +59,8 @@ export function MealTimePicker({ mealType, time, onChange }: Props) {
           value={time}
           onChange={(e) => {
             if (e.target.value === "") return;
-            onChange({ mealType: mealFor(e.target.value), time: e.target.value });
+            // A typed time moves the meal, unless the user chose drinks and other.
+            onChange({ mealType: mealType === "other" ? "other" : mealFor(e.target.value), time: e.target.value });
           }}
         />
       </label>

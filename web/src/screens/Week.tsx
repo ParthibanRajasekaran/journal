@@ -42,7 +42,7 @@ export function Week({ onOpenDay, proteinTarget, encourage }: Props) {
           {weekLines(days, proteinTarget).map((line) => (
             <p key={line}>{line}</p>
           ))}
-          <p className="fine-print muted">{APPROXIMATE}</p>
+          {days.some((d) => d.meal_count > 0) && <p className="fine-print muted">{APPROXIMATE}</p>}
         </section>
       )}
       {days && (

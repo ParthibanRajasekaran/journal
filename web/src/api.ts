@@ -24,7 +24,7 @@ export interface Totals {
 export interface Meal {
   id: string;
   client_id: string;
-  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack" | "other";
   eaten_at: string;
   name: string;
   calories: number;

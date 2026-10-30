@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
-MEAL_TYPES = ("breakfast", "lunch", "dinner", "snack")
+MEAL_TYPES = ("breakfast", "lunch", "dinner", "snack", "other")
 MEAL_SOURCES = ("ai_confirmed", "ai_edited", "manual")
 
 
