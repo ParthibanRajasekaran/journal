@@ -40,7 +40,7 @@ export function KeyHelp({ onSaved }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await api.saveAiKey(chosen.id, apiKey.trim());
+      await api.saveAiKey(chosen.id, apiKey.trim(), agreed);
       onSaved();
     } catch (err) {
       setError((err as ApiError).message);
@@ -52,7 +52,7 @@ export function KeyHelp({ onSaved }: Props) {
   return (
     <div className="key-help" role="region" aria-label="Connect an AI account">
       <p className="key-help-title">Connect your AI account to estimate meals</p>
-      <p className="muted">Pick the account you already use. Create a key there, then paste it below. Only you can see it.</p>
+      <p className="muted">Pick the account you already use. Create a key there, then paste it below. Journal stores it encrypted and never shows it again.</p>
 
       <div className="provider-buttons">
         {PROVIDERS.map((p) => (
@@ -81,11 +81,14 @@ export function KeyHelp({ onSaved }: Props) {
             onChange={(e) => setApiKey(e.target.value)}
           />
           <label className="row" style={{ justifyContent: "flex-start", fontSize: 14, cursor: "pointer" }}>
-            <input type="checkbox" style={{ width: 20, minHeight: 20 }} checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-            My requests go to {chosen.label}, under its terms, on my account.
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+            <span>
+              Send my meal descriptions to {chosen.label} to make estimates. {chosen.label}&apos;s terms govern how it
+              uses them.
+            </span>
           </label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button type="submit" className="primary" disabled={saving || apiKey.trim().length === 0}>
+          <button type="submit" className="primary" disabled={saving || apiKey.trim().length === 0 || !agreed}>
             {saving ? "Checking…" : "Save and estimate"}
           </button>
         </form>

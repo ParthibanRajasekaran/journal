@@ -131,7 +131,8 @@ async function request<T>(method: string, path: string, body?: unknown, extra?: 
 export const api = {
   signInUrl: `${BASE}/auth/google/start`,
   me: () => request<Profile>("GET", "/me"),
-  updateMe: (patch: { display_name?: string; daily_targets?: { calories?: number; protein_g?: number } }) =>
+  // A target set to null is cleared.
+  updateMe: (patch: { display_name?: string; daily_targets?: { calories?: number | null; protein_g?: number | null } }) =>
     request<Profile>("PATCH", "/me", patch),
   deleteAccount: () => request<void>("DELETE", "/me"),
   logout: () => request<void>("POST", "/auth/logout"),
@@ -149,10 +150,11 @@ export const api = {
     request<EstimateReply>("POST", "/estimates", answers ? { text, answers } : { text }),
 
   aiKeys: () => request<AiKeyStatus[]>("GET", "/me/ai-keys"),
-  saveAiKey: (provider: Provider, apiKey: string) =>
+  // The server refuses a save unless the user has agreed, so the flag is sent as the user set it.
+  saveAiKey: (provider: Provider, apiKey: string, agreed: boolean) =>
     request<AiKeyStatus>("PUT", `/me/ai-keys/${provider}`, {
       api_key: apiKey,
-      acknowledge_provider_terms: true,
+      acknowledge_provider_terms: agreed,
     }),
   deleteAiKey: (provider: Provider) => request<void>("DELETE", `/me/ai-keys/${provider}`),
 };

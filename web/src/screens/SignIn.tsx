@@ -28,7 +28,7 @@ export function SignIn() {
         )}
 
         <ul className="promises">
-          <li>Your meals stay private.</li>
+          <li>Only you see your meals in Journal.</li>
           <li>We never sell your data.</li>
           <li>Delete everything, any time, from Settings.</li>
         </ul>

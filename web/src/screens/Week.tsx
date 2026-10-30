@@ -10,6 +10,7 @@ export function Week({ onOpenDay }: Props) {
   const [start, setStart] = useState(() => mondayOf(localDay()));
   const [days, setDays] = useState<Totals[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     setError(null);
@@ -17,16 +18,21 @@ export function Week({ onOpenDay }: Props) {
       .week(start, userTz)
       .then(setDays)
       .catch((err: Error) => setError(err.message));
-  }, [start]);
+  }, [start, attempt]);
 
   return (
     <>
       <div className="row">
-        <button onClick={() => setStart(addDays(start, -7))} aria-label="Previous week">‹</button>
+        <button className="ghost icon-btn" onClick={() => setStart(addDays(start, -7))} aria-label="Previous week">‹</button>
         <h1 style={{ fontSize: 18, textAlign: "center" }}>Week of {formatDay(start)}</h1>
-        <button onClick={() => setStart(addDays(start, 7))} aria-label="Next week">›</button>
+        <button className="ghost icon-btn" onClick={() => setStart(addDays(start, 7))} aria-label="Next week">›</button>
       </div>
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && (
+        <section className="card load-error" role="alert">
+          <p>Couldn't load this week. {error}</p>
+          <button className="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </section>
+      )}
       {days && (
         <ul className="week-grid" style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {days.map((day) => (

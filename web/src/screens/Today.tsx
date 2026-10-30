@@ -15,6 +15,7 @@ export function Today({ day, onDayChange, onAdd }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -27,6 +28,7 @@ export function Today({ day, onDayChange, onAdd }: Props) {
   useEffect(load, [load]);
 
   async function remove(meal: Meal) {
+    setConfirming(null);
     try {
       await api.deleteMeal(meal.id);
       load();
@@ -36,6 +38,7 @@ export function Today({ day, onDayChange, onAdd }: Props) {
   }
 
   const isToday = day === localDay();
+  const hasMeals = summary !== null && summary.meals.length > 0;
   return (
     <>
       <div className="row" style={{ marginBottom: 6 }}>
@@ -44,59 +47,83 @@ export function Today({ day, onDayChange, onAdd }: Props) {
         <button className="ghost icon-btn" onClick={() => onDayChange(addDays(day, 1))} aria-label="Next day" disabled={isToday}>›</button>
       </div>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && summary && <p className="error" role="alert">{error}</p>}
 
       {summary ? (
         <div className="today-grid">
           <section>
             <SummaryCard summary={summary} />
-            <button className="primary" style={{ width: "100%", marginBottom: 14 }} onClick={onAdd}>Add meal</button>
+            <button className="primary add-inline" style={{ width: "100%", marginBottom: 14 }} onClick={onAdd}>Add meal</button>
           </section>
           <section>
-            {MEAL_ORDER.map((type) => {
-              const meals = summary.meals.filter((m) => m.meal_type === type);
-              return (
-                <div key={type}>
-                  <h2>{type}</h2>
-                  {meals.length === 0 ? (
-                    <p className="muted" style={{ margin: "0 0 8px" }}>Nothing logged yet.</p>
-                  ) : (
-                    <ul className="meal-group">
-                      {meals.map((meal) => (
-                        <li key={meal.id} className="meal-item">
-                          {editing === meal.id ? (
-                            <EditMeal
-                              meal={meal}
-                              onCancel={() => setEditing(null)}
-                              onSaved={() => {
-                                setEditing(null);
-                                load();
-                              }}
-                            />
-                          ) : (
-                            <>
-                              <span>
-                                <strong>{meal.name}</strong>
-                                <span className="muted"> · {timeOf(meal.eaten_at)} · <span className="num">{Math.round(meal.calories)}</span> kcal</span>
-                                <span className="muted num" style={{ display: "block", fontSize: 13 }}>
-                                  P {Math.round(meal.protein_g)} g · C {Math.round(meal.carbs_g)} g · F {Math.round(meal.fat_g)} g
+            {!hasMeals ? (
+              <div className="card empty-day">
+                <p>Nothing logged for this day yet.</p>
+                <button className="primary" onClick={onAdd}>Add your first meal</button>
+              </div>
+            ) : (
+              MEAL_ORDER.map((type) => {
+                const meals = summary.meals.filter((m) => m.meal_type === type);
+                return (
+                  <div key={type}>
+                    <h2>{type}</h2>
+                    {meals.length === 0 ? (
+                      <p className="muted" style={{ margin: "0 0 8px" }}>Nothing logged yet.</p>
+                    ) : (
+                      <ul className="meal-group">
+                        {meals.map((meal) => (
+                          <li key={meal.id} className="meal-item">
+                            {editing === meal.id ? (
+                              <EditMeal
+                                meal={meal}
+                                onCancel={() => setEditing(null)}
+                                onSaved={() => {
+                                  setEditing(null);
+                                  load();
+                                }}
+                                onStale={() => {
+                                  setEditing(null);
+                                  load();
+                                }}
+                              />
+                            ) : confirming === meal.id ? (
+                              <div className="meal-confirm" role="alert">
+                                <p>Delete {meal.name}? This can't be undone.</p>
+                                <span className="meal-actions">
+                                  <button onClick={() => setConfirming(null)} autoFocus>Keep it</button>
+                                  <button className="danger-solid" onClick={() => remove(meal)}>Delete</button>
                                 </span>
-                              </span>
-                              <span style={{ display: "flex", gap: 4 }}>
-                                <button className="ghost" onClick={() => setEditing(meal.id)} aria-label={`Edit ${meal.name}`}>Edit</button>
-                                <button className="ghost" onClick={() => remove(meal)} aria-label={`Delete ${meal.name}`}>Delete</button>
-                              </span>
-                            </>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
+                              </div>
+                            ) : (
+                              <>
+                                <span>
+                                  <strong>{meal.name}</strong>
+                                  <span className="muted"> · {timeOf(meal.eaten_at)} · <span className="num">{Math.round(meal.calories)}</span> kcal</span>
+                                  <span className="muted num" style={{ display: "block", fontSize: 13 }}>
+                                    P {Math.round(meal.protein_g)} g · C {Math.round(meal.carbs_g)} g · F {Math.round(meal.fat_g)} g
+                                  </span>
+                                </span>
+                                <span className="meal-actions">
+                                  <button className="ghost" onClick={() => setEditing(meal.id)} aria-label={`Edit ${meal.name}`}>Edit</button>
+                                  <button className="ghost" onClick={() => setConfirming(meal.id)} aria-label={`Delete ${meal.name}`}>Delete</button>
+                                </span>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </section>
         </div>
+      ) : error ? (
+        <section className="card load-error" role="alert">
+          <p>Couldn't load this day. {error}</p>
+          <button className="primary" onClick={load}>Try again</button>
+        </section>
       ) : (
         <div className="skeleton" aria-label="Loading day" />
       )}

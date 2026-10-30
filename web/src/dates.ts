@@ -1,7 +1,6 @@
-// The API groups meals by UTC calendar day. The app uses the same days, so the
-// Today and Week screens match the server's totals.
+// Days are the user's own calendar days. The browser sends its time zone with each day or week
+// request, and the server groups meals by that zone, so totals match what the user sees.
 
-// "Today" and every day on screen are the user's own calendar days.
 export const userTz: string = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export function localDay(date: Date = new Date()): string {
@@ -31,4 +30,19 @@ export function formatDay(day: string): string {
 
 export function timeOf(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+// The day and HH:MM of a stored moment, in the user's own zone (for the edit form).
+export function dayAndTime(iso: string): { day: string; time: string } {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    day: localDay(date),
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
+}
+
+// A day and HH:MM in the user's zone, as an exact moment for the API.
+export function momentOf(day: string, time: string): string {
+  return new Date(`${day}T${time}:00`).toISOString();
 }

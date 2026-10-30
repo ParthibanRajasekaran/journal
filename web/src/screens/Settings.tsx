@@ -48,9 +48,10 @@ function TargetsForm({ profile, onSaved }: { profile: Profile; onSaved: (p: Prof
     setMessage(null);
     try {
       const saved = await api.updateMe({
+        // An empty field clears that target.
         daily_targets: {
-          calories: calories === "" ? undefined : Number(calories),
-          protein_g: protein === "" ? undefined : Number(protein),
+          calories: calories === "" ? null : Number(calories),
+          protein_g: protein === "" ? null : Number(protein),
         },
       });
       onSaved(saved);
@@ -67,8 +68,9 @@ function TargetsForm({ profile, onSaved }: { profile: Profile; onSaved: (p: Prof
       <input id="cal" inputMode="numeric" value={calories} onChange={(e) => setCalories(e.target.value)} />
       <label htmlFor="prot">Protein, grams (0–400)</label>
       <input id="prot" inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} />
+      <p className="muted fine-print" style={{ textAlign: "left" }}>Leave a field empty to clear that target.</p>
       <div className="row" style={{ marginTop: 12 }}>
-        <span className="muted">{message}</span>
+        <span className="muted" role="status">{message}</span>
         <button type="submit" className="primary">Save targets</button>
       </div>
     </form>
@@ -104,12 +106,14 @@ function AiKeys() {
       </div>
       <p className="muted">Your key is checked once, stored encrypted, and never shown again.</p>
       {error && <p className="error" role="alert">{error}</p>}
-      {keys.length > 0 && (
+      {keys.length > 0 ? (
         <ul className="plain">
           {keys.map((key) => (
             <KeyRow key={key.provider} status={key} onChanged={load} />
           ))}
         </ul>
+      ) : (
+        <p className="muted">No AI key connected yet. Meal estimates need one.</p>
       )}
       <AddKey onSaved={load} />
     </section>
@@ -146,7 +150,7 @@ function AddKey({ onSaved }: { onSaved: () => void }) {
     setError(null);
     setSaving(true);
     try {
-      await api.saveAiKey(provider, apiKey.trim());
+      await api.saveAiKey(provider, apiKey.trim(), agreed);
       setApiKey("");
       setAgreed(false);
       onSaved();
@@ -182,11 +186,14 @@ function AddKey({ onSaved }: { onSaved: () => void }) {
         onChange={(e) => setApiKey(e.target.value)}
       />
       <label className="row" style={{ justifyContent: "flex-start", fontSize: 14, cursor: "pointer" }}>
-        <input type="checkbox" style={{ width: 20, minHeight: 20 }} checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-        My requests go to this provider, under its terms, on my account.
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>
+          Send my meal descriptions to {selected.label} to make estimates. {selected.label}&apos;s terms govern how it
+          uses them.
+        </span>
       </label>
       {error && <p className="error" role="alert">{error}</p>}
-      <button type="submit" className="primary" style={{ marginTop: 12 }} disabled={saving || apiKey.trim().length === 0}>
+      <button type="submit" className="primary" style={{ marginTop: 12 }} disabled={saving || apiKey.trim().length === 0 || !agreed}>
         {saving ? "Checking…" : "Save key"}
       </button>
     </form>

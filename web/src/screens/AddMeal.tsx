@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
-import { localDay } from "../dates";
+import { localDay, momentOf } from "../dates";
 import { defaultMealFor, MealTimePicker, usualTime } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
 
@@ -16,6 +16,14 @@ const MEAL_LABEL: Record<Meal["meal_type"], string> = { breakfast: "Breakfast", 
 
 type Values = { calories: string; protein_g: string; carbs_g: string; fat_g: string };
 
+// What the estimate said, so we can tell whether the user changed it before saving.
+interface Estimated {
+  name: string;
+  values: Values;
+}
+
+const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g: "protein g", carbs_g: "carbs g", fat_g: "fat g" };
+
 // One path: describe, check the estimate, save. Numbers are typed only when asked for.
 export function AddMeal({ day, onDone, onCancel }: Props) {
   const [name, setName] = useState("");
@@ -26,8 +34,10 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [manual, setManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const [describing, setDescribing] = useState("");
+  const [estimateError, setEstimateError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [questions, setQuestions] = useState<EstimateQuestion[] | null>(null);
@@ -35,6 +45,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [items, setItems] = useState<EstimateItem[]>([]);
   const [assumptions, setAssumptions] = useState<string[]>([]);
   const [provider, setProvider] = useState<string | null>(null);
+  const [estimated, setEstimated] = useState<Estimated | null>(null);
+  const [announce, setAnnounce] = useState("");
   const [showDetails, setShowDetails] = useState(false);
 
   function applyEstimate(result: Awaited<ReturnType<typeof api.estimate>>) {
@@ -44,30 +56,33 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
       return;
     }
     const e = result.estimate;
+    const next: Values = {
+      calories: String(Math.round(e.calories)),
+      protein_g: String(Math.round(e.protein_g)),
+      carbs_g: String(Math.round(e.carbs_g)),
+      fat_g: String(Math.round(e.fat_g)),
+    };
     setQuestions(null);
     setItems(e.items);
     setAssumptions(e.assumptions);
     setProvider(result.provider);
     setName(e.name);
-    setValues({
-      calories: String(Math.round(e.calories)),
-      protein_g: String(Math.round(e.protein_g)),
-      carbs_g: String(Math.round(e.carbs_g)),
-      fat_g: String(Math.round(e.fat_g)),
-    });
+    setValues(next);
+    setEstimated({ name: e.name, values: next });
+    setAnnounce(`Estimate ready: ${next.calories} kcal.`);
   }
 
   async function estimate(withAnswers?: SuppliedAnswer[]) {
-    setError(null);
+    setEstimateError(null);
     setNeedsKey(false);
-    if (!withAnswers && describing.trim().length < 3) return setError("Describe what you ate first.");
+    if (!withAnswers && describing.trim().length < 3) return setEstimateError("Describe what you ate first.");
     setEstimating(true);
     try {
       applyEstimate(await api.estimate(describing.trim(), withAnswers));
     } catch (err) {
       const e = err as ApiError;
       if (e.status === 409) setNeedsKey(true);
-      else setError(e.message);
+      else setEstimateError(e.message);
     } finally {
       setEstimating(false);
     }
@@ -91,6 +106,15 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     return null;
   }
 
+  // Estimated and then changed by the user counts as edited; otherwise it is confirmed as is.
+  function sourceFor(): "manual" | "ai_confirmed" | "ai_edited" {
+    if (!estimated) return "manual";
+    const changed =
+      name.trim() !== estimated.name ||
+      (Object.keys(LIMITS) as (keyof Values)[]).some((field) => values[field] !== estimated.values[field]);
+    return changed ? "ai_edited" : "ai_confirmed";
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const failure = problem();
@@ -102,13 +126,13 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         client_id: crypto.randomUUID(),
         meal_type: mealType,
         // Stored as an exact moment, from the time picked in the user's own time zone.
-        eaten_at: new Date(`${day}T${time}:00`).toISOString(),
+        eaten_at: momentOf(day, time),
         name: name.trim(),
         calories: Number(values.calories),
         protein_g: Number(values.protein_g),
         carbs_g: Number(values.carbs_g),
         fat_g: Number(values.fat_g),
-        source: provider ? "ai_confirmed" : "manual",
+        source: sourceFor(),
       });
       onDone();
     } catch (err) {
@@ -120,10 +144,27 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
 
   const hasEstimate = provider !== null;
   const summary = `${MEAL_LABEL[mealType]} · ${time}`;
+  const unsaved = describing.trim().length > 0 || hasEstimate || name.trim().length > 0;
+
+  function cancel() {
+    if (unsaved) setConfirmCancel(true);
+    else onCancel();
+  }
+
+  function macroFields() {
+    return (Object.keys(LIMITS) as (keyof Values)[]).map((field) => (
+      <div key={field}>
+        <label htmlFor={field}>{FIELD_LABEL[field]}</label>
+        <input id={field} inputMode="decimal" value={values[field]} onChange={(e) => setValues({ ...values, [field]: e.target.value })} />
+      </div>
+    ));
+  }
 
   return (
     <form onSubmit={submit} noValidate className="card add-form">
       <h1>Add meal{day !== localDay() ? ` for ${day}` : ""}</h1>
+
+      <p className="visually-hidden" role="status">{announce}</p>
 
       <div className="estimate-box">
         <label htmlFor="describe">What did you eat?</label>
@@ -139,6 +180,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
             {estimating ? "Working…" : "Estimate"}
           </button>
         </div>
+        {estimateError && <p className="error" role="alert">{estimateError}</p>}
 
         {questions && (
           <div className="questions" role="group" aria-label="One quick question">
@@ -170,7 +212,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         )}
 
         {hasEstimate && (
-          <div className="result" role="status">
+          <div className="result">
             <div className="result-head">
               <input
                 aria-label="Meal name"
@@ -180,13 +222,10 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="result-kcal num">
-              <span className="big-kcal">{values.calories}</span>
-              <span className="muted"> kcal</span>
-            </div>
-            <div className="macro-line num muted">
-              Protein {values.protein_g} g · Carbs {values.carbs_g} g · Fat {values.fat_g} g
-            </div>
+            <div className="macro-grid">{macroFields()}</div>
+            <p className="muted fine-print" style={{ textAlign: "left", margin: "10px 0 0" }}>
+              Estimated with your {PROVIDER_NAME[provider as keyof typeof PROVIDER_NAME] ?? "AI"} key. Check it before saving.
+            </p>
             <button type="button" className="ghost other-link" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>
               {showDetails ? "Hide details" : "Show details"}
             </button>
@@ -207,7 +246,6 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
                     {assumptions.map((a) => <li key={a}>{a}</li>)}
                   </ul>
                 )}
-                <p className="muted fine-print">Estimated with your {PROVIDER_NAME[provider as keyof typeof PROVIDER_NAME] ?? "AI"} key. Check it before saving.</p>
               </div>
             )}
           </div>
@@ -234,15 +272,14 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         )}
       </div>
 
-      {(manual || (hasEstimate && showDetails)) && (
-        <div className="macro-grid">
-          {(Object.keys(LIMITS) as (keyof typeof LIMITS)[]).map((field) => (
-            <div key={field}>
-              <label htmlFor={field}>{field === "calories" ? "kcal" : field.replace("_g", "") + " g"}</label>
-              <input id={field} inputMode="decimal" value={values[field]} onChange={(e) => setValues({ ...values, [field]: e.target.value })} />
-            </div>
-          ))}
-        </div>
+      {manual && !hasEstimate && (
+        <>
+          <div className="manual-name">
+            <label htmlFor="name">Name</label>
+            <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
+          </div>
+          <div className="macro-grid">{macroFields()}</div>
+        </>
       )}
 
       {!hasEstimate && !manual && (
@@ -251,21 +288,25 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         </button>
       )}
 
-      {manual && !hasEstimate && (
-        <div className="manual-name">
-          <label htmlFor="name">Name</label>
-          <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
-        </div>
-      )}
-
       {error && <p className="error" role="alert">{error}</p>}
 
-      <div className="row" style={{ marginTop: 16 }}>
-        <button type="button" className="ghost" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="primary" disabled={saving || (!hasEstimate && !manual)}>
-          {saving ? "Saving…" : "Save meal"}
-        </button>
-      </div>
+      {confirmCancel ? (
+        <div className="meal-confirm" role="alert" style={{ marginTop: 16 }}>
+          <p>Discard this meal? What you typed will be lost.</p>
+          <span className="meal-actions">
+            <button type="button" onClick={() => setConfirmCancel(false)} autoFocus>Keep editing</button>
+            <button type="button" className="danger-solid" onClick={onCancel}>Discard</button>
+          </span>
+        </div>
+      ) : (
+        <div className="form-actions">
+          {!hasEstimate && !manual && <p className="hint muted">Estimate a meal or enter the numbers first.</p>}
+          <button type="button" className="ghost" onClick={cancel}>Cancel</button>
+          <button type="submit" className="primary" disabled={saving || (!hasEstimate && !manual)}>
+            {saving ? "Saving…" : "Save meal"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

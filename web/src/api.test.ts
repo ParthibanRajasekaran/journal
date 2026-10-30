@@ -57,10 +57,17 @@ describe("api client", () => {
 
   it("never puts an AI key in the URL", async () => {
     const spy = mockFetch(() => new Response(JSON.stringify({ provider: "openai" }), { status: 200 }));
-    await api.saveAiKey("openai", "sk-" + "a".repeat(30));
+    await api.saveAiKey("openai", "sk-" + "a".repeat(30), true);
     const [url, init] = spy.mock.calls[0];
     expect(String(url)).not.toContain("sk-");
     expect(JSON.parse(init.body).api_key).toBe("sk-" + "a".repeat(30));
+  });
+
+  it("sends the consent flag as the user set it, never a fixed true", async () => {
+    const spy = mockFetch(() => new Response(JSON.stringify({ provider: "openai" }), { status: 200 }));
+    await api.saveAiKey("openai", "sk-" + "a".repeat(30), false);
+    const [, init] = spy.mock.calls[0];
+    expect(JSON.parse(init.body).acknowledge_provider_terms).toBe(false);
   });
 
   it("sends the version we read, so an out-of-date edit is refused", async () => {

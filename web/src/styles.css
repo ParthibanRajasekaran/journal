@@ -114,8 +114,10 @@ input:focus, select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.16);
 }
-label { display: block; margin: 14px 0 6px; font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
+label { display: block; margin: 14px 0 6px; font-size: 14px; color: var(--muted); letter-spacing: 0.02em; }
 .error { color: var(--alert); margin: 10px 0; font-size: 14px; }
+input[type="checkbox"] { width: 20px; min-width: 20px; min-height: 20px; height: 20px; padding: 0; margin: 0; flex: none; accent-color: var(--accent); }
+.plain { list-style: none; padding: 0; margin: 0 0 12px; }
 
 /* Progress ring */
 .hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
@@ -170,7 +172,7 @@ label { display: block; margin: 14px 0 6px; font-size: 13px; color: var(--muted)
   background: rgba(255, 255, 255, 0.78);
   border-bottom: 1px solid var(--line);
 }
-.topbar-inner { width: min(1120px, 100%); margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 24px; }
+.topbar-inner { width: min(1240px, 100%); margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 24px; }
 .brand { font-weight: 700; letter-spacing: 0.08em; color: var(--accent); margin-right: auto; }
 .topbar nav { display: flex; gap: 6px; }
 .topbar nav a {
@@ -194,9 +196,11 @@ nav.tabs {
 }
 nav.tabs a { flex: 1; text-align: center; min-height: 44px; line-height: 44px; color: var(--muted); text-decoration: none; border-radius: 12px; transition: color 200ms var(--ease), background 200ms var(--ease); }
 nav.tabs a.active { color: var(--accent); background: var(--accent-soft); }
+nav.tabs a.tab-add { color: var(--accent-ink); background: var(--accent); font-weight: 650; }
 
 @media (min-width: 768px) {
   .topbar { display: block; }
+  .add-inline { display: none; }
   nav.tabs { display: none; }
   main.shell { padding-bottom: 40px; }
   .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
@@ -207,7 +211,8 @@ nav.tabs a.active { color: var(--accent); background: var(--accent-soft); }
 }
 
 /* Week */
-.day-tile { text-align: left; display: block; width: 100%; padding: 14px 16px; background: transparent; }
+.day-tile { text-align: left; display: block; width: 100%; padding: 14px 16px; background: transparent; border: 0; box-shadow: none; }
+.day-tile:hover { background: var(--accent-soft); }
 .day-tile .date { font-weight: 600; }
 
 /* Click ripple (added by ripple.ts) */
@@ -323,15 +328,25 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 
 /* Time picker: animated chips */
 .time-picker { margin-top: 6px; }
-.label-text { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 8px; }
+.label-text { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   min-height: 40px; padding: 0 14px; border-radius: 999px; flex-direction: column; line-height: 1.1; gap: 2px;
   transition: background 320ms var(--ease), color 320ms var(--ease), transform 220ms var(--spring), box-shadow 320ms var(--ease);
 }
-.chip small { font-size: 11px; color: var(--muted); }
-.chip.chip-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: var(--glow); transform: translateY(-1px); }
-.chip.chip-on small { color: rgba(255, 255, 255, 0.85); }
+.chip small { font-size: 12px; color: var(--muted); }
+.chip.chip-on, .provider-btn.chip-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: var(--glow); transform: translateY(-1px); }
+.chip.chip-on small { color: #ffffff; }
+.provider-btn.chip-on:hover { color: var(--accent-ink); }
+.meal-actions { display: flex; gap: 4px; flex: none; }
+.meal-confirm { width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.meal-confirm p { margin: 0; }
+.load-error { text-align: center; padding: 28px 20px; }
+.load-error p { margin: 0 0 12px; }
+.empty-day { text-align: center; padding: 22px 20px; }
+.empty-day p { margin: 0 0 12px; color: var(--muted); }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.form-actions .hint { flex-basis: 100%; text-align: right; margin: 0; font-size: 14px; }
 .time-manual { margin-top: 10px; max-width: 200px; }
 fieldset.question { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; min-width: 0; background: var(--surface); }
 fieldset.question legend { font-weight: 600; padding: 0 6px; }

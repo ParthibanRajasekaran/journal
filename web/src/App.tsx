@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, Profile } from "./api";
+import { api, ApiError, Profile } from "./api";
 import { SignIn } from "./screens/SignIn";
 import { Today } from "./screens/Today";
 import { AddMeal } from "./screens/AddMeal";
@@ -9,17 +9,24 @@ import { localDay } from "./dates";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
 type Tab = "today" | "week" | "settings";
+// "error" means the server could not be reached. Only a 401 means the user must sign in again.
+type Loaded = Profile | null | "loading" | "error";
 
 export function App() {
-  const [profile, setProfile] = useState<Profile | null | "loading">("loading");
+  const [profile, setProfile] = useState<Loaded>("loading");
+  const [attempt, setAttempt] = useState(0);
   const [screen, setScreen] = useState<Screen>({ name: "today", day: localDay() });
 
   useEffect(() => {
+    setProfile("loading");
     api
       .me()
       .then(setProfile)
-      .catch(() => setProfile(null));
-  }, []);
+      .catch((err: unknown) => {
+        const signedOut = err instanceof ApiError && err.status === 401;
+        setProfile(signedOut ? null : "error");
+      });
+  }, [attempt]);
 
   if (profile === "loading") {
     return (
@@ -29,6 +36,16 @@ export function App() {
     );
   }
   if (profile === null) return <SignIn />;
+  if (profile === "error") {
+    return (
+      <main className="shell">
+        <section className="card load-error" role="alert">
+          <p>Journal can't be reached right now. Check your connection, then try again.</p>
+          <button className="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </section>
+      </main>
+    );
+  }
 
   const tab: Tab = screen.name === "add" ? "today" : screen.name;
   const go = (next: Screen) => (event: React.MouseEvent) => {
@@ -36,6 +53,7 @@ export function App() {
     setScreen(next);
   };
   const todayNow = (): Screen => ({ name: "today", day: localDay() });
+  const addNow = (): Screen => ({ name: "add", day: localDay() });
 
   return (
     <>
@@ -47,7 +65,7 @@ export function App() {
             <a href="#week" className={tab === "week" ? "active" : ""} onClick={go({ name: "week" })}>Week</a>
             <a href="#settings" className={tab === "settings" ? "active" : ""} onClick={go({ name: "settings" })}>Settings</a>
           </nav>
-          <button className="primary" onClick={() => setScreen({ name: "add", day: localDay() })}>+ Add meal</button>
+          <button className="primary" onClick={() => setScreen(addNow())}>+ Add meal</button>
           <button
             className="ghost"
             onClick={() => {
@@ -75,6 +93,7 @@ export function App() {
       <nav className="tabs" aria-label="Main mobile">
         <a href="#today" className={tab === "today" ? "active" : ""} onClick={go(todayNow())}>Today</a>
         <a href="#week" className={tab === "week" ? "active" : ""} onClick={go({ name: "week" })}>Week</a>
+        <a href="#add" className="tab-add" onClick={go(addNow())}>+ Add</a>
         <a href="#settings" className={tab === "settings" ? "active" : ""} onClick={go({ name: "settings" })}>Settings</a>
       </nav>
     </>
