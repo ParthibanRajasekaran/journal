@@ -33,7 +33,7 @@ processors:
     error_mode: ignore
     logs:
       log_record:
-        - 'not IsMatch(body, ".*\"logger\":\"journal.*")'
+        - 'not IsMatch(body, ".*\"logger\": ?\"journal.*")'
   # Second line of defence: drop request headers and bodies even if application code adds them.
   attributes/redact:
     actions:
