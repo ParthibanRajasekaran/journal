@@ -3,6 +3,7 @@ import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } f
 import { localDay, momentOf } from "../dates";
 import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
+import { Hourglass as HourglassIcon } from "lucide-react";
 
 interface Props {
   day: string;
@@ -350,9 +351,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
 // An hourglass that turns while the estimate runs. Reduced motion shows it still.
 function Hourglass() {
   return (
-    <svg className="hourglass" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 2h12M6 22h12M7 2c0 5 10 5 10 10S7 17 7 22M17 2c0 5-10 5-10 10s10 5 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9 19c0-2 3-3 3-5s-3-3-3-5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
+    <span className="hourglass" aria-hidden="true">
+      <HourglassIcon size={22} strokeWidth={1.8} />
+    </span>
   );
 }

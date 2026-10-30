@@ -3,7 +3,10 @@ import { api, DaySummary, Meal } from "../api";
 import { EditMeal } from "./EditMeal";
 import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
-import { savedLine } from "../encouragement";
+import { savedLine, proteinTier } from "../encouragement";
+import { Hand, Heart, ThumbsUp, type LucideIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import confetti from "canvas-confetti";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack", "other"];
 
@@ -16,7 +19,8 @@ interface Props {
 }
 
 // A small, warm acknowledgement after each save. It is chosen once per visit to Today.
-const SAVED_ICONS = ["👍", "👏", "💚"];
+// Lucide has no clapping hands, so the open hand stands in for it.
+const SAVED_ICONS: LucideIcon[] = [ThumbsUp, Hand, Heart];
 
 export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
@@ -24,7 +28,8 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(savedNote);
-  const [savedIcon] = useState(() => SAVED_ICONS[Math.floor(Math.random() * SAVED_ICONS.length)]);
+  const [SavedIcon] = useState(() => SAVED_ICONS[Math.floor(Math.random() * SAVED_ICONS.length)]);
+  const reduceMotion = useReducedMotion();
 
   // The confirmation fades on its own, and a tap dismisses it.
   useEffect(() => {
@@ -32,6 +37,16 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
     const timer = setTimeout(() => setShowSaved(false), 3500);
     return () => clearTimeout(timer);
   }, [showSaved, summary]);
+
+  // A small burst only when the protein goal is reached, and never with reduced motion.
+  const amazing = summary !== null && proteinTier(summary.protein_g, summary.targets.protein_g) === "amazing";
+  useEffect(() => {
+    if (showSaved && summary && amazing && !reduceMotion) {
+      void confetti({ particleCount: 80, spread: 70, origin: { y: 0.3 } });
+    }
+    // Fire once when the note first appears, not on every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSaved, summary?.protein_g]);
 
   const load = useCallback(() => {
     setError(null);
@@ -66,10 +81,19 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
       {error && summary && <p className="error" role="alert">{error}</p>}
 
       {showSaved && summary && (
-        <p className="saved-note" role="status" onClick={() => setShowSaved(false)}>
-          <span className="check" aria-hidden="true">{savedIcon}</span>
+        <motion.p
+          className="saved-note"
+          role="status"
+          onClick={() => setShowSaved(false)}
+          initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <span className="check" aria-hidden="true">
+            <SavedIcon size={16} strokeWidth={2.4} />
+          </span>
           {savedLine(summary.protein_g, summary.targets.protein_g)}
-        </p>
+        </motion.p>
       )}
 
       {summary ? (
