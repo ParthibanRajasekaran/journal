@@ -58,12 +58,16 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form onSubmit={submit} noValidate className="card add-form">
       <h1>Add meal{day !== utcDay() ? ` for ${day}` : ""}</h1>
 
+      <div className="form-grid">
+      <div className="span-2">
       <label htmlFor="name">What did you eat?</label>
       <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
+      </div>
 
+      <div>
       <label htmlFor="type">Meal</label>
       <select id="type" value={mealType} onChange={(e) => setMealType(e.target.value as Meal["meal_type"])}>
         <option value="breakfast">Breakfast</option>
@@ -72,10 +76,14 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         <option value="snack">Snack</option>
       </select>
 
+      </div>
+      <div>
       <label htmlFor="time">Time (UTC)</label>
       <input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+      </div>
+      </div>
 
-      <div className="row" style={{ gap: 12, alignItems: "flex-start" }}>
+      <div className="macro-grid">
         {(Object.keys(LIMITS) as (keyof typeof LIMITS)[]).map((field) => (
           <div key={field} style={{ flex: 1 }}>
             <label htmlFor={field}>{field === "calories" ? "Calories (kcal)" : field.replace("_g", "") + " (g)"}</label>

@@ -17,16 +17,22 @@ export function Settings({ profile, onProfile, onSignedOut }: Props) {
   return (
     <>
       <h1>Settings</h1>
-      <TargetsForm profile={profile} onSaved={onProfile} />
-      <AiKeys />
-      <section className="card">
-        <h2 style={{ marginTop: 0 }}>Account</h2>
-        <p className="muted">Signed in as {profile.email}</p>
-        <div className="row">
-          <button onClick={() => api.logout().then(onSignedOut)}>Sign out</button>
-          <DeleteAccount onDeleted={onSignedOut} />
+      <div className="settings-grid">
+        <div>
+          <TargetsForm profile={profile} onSaved={onProfile} />
+          <section className="card">
+            <h2 style={{ marginTop: 0 }}>Account</h2>
+            <p className="muted">Signed in as {profile.email}</p>
+            <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
+              <button onClick={() => api.logout().then(onSignedOut)}>Sign out</button>
+              <DeleteAccount onDeleted={onSignedOut} />
+            </div>
+          </section>
         </div>
-      </section>
+        <div>
+          <AiKeys />
+        </div>
+      </div>
     </>
   );
 }
