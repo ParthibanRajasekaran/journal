@@ -319,3 +319,23 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 .provider-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .provider-btn { text-decoration: none; }
 .key-form { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+
+/* Time picker: animated chips */
+.time-picker { margin-top: 6px; }
+.label-text { display: block; font-size: 13px; color: var(--muted); margin: 14px 0 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 40px; padding: 0 14px; border-radius: 999px; flex-direction: column; line-height: 1.1; gap: 2px;
+  transition: background 320ms var(--ease), color 320ms var(--ease), transform 220ms var(--spring), box-shadow 320ms var(--ease);
+}
+.chip small { font-size: 11px; color: var(--muted); }
+.chip.chip-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: var(--glow); transform: translateY(-1px); }
+.chip.chip-on small { color: rgba(255, 255, 255, 0.85); }
+.time-manual { margin-top: 10px; max-width: 200px; }
+fieldset.question { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; min-width: 0; background: var(--surface); }
+fieldset.question legend { font-weight: 600; padding: 0 6px; }
+.questions { margin-top: 12px; display: grid; gap: 10px; }
+.assumptions, .items { list-style: none; padding: 0; margin: 10px 0 0; font-size: 14px; }
+.assumptions li { color: var(--muted); padding: 4px 0; }
+.items li { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
