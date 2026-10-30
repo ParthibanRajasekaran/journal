@@ -61,7 +61,6 @@ export function MealTimePicker({ mealType, time, onChange }: Props) {
               onClick={() => onChange({ mealType: m.type, time: m.time })}
             >
               <span>{m.label}</span>
-              <small>{m.time}</small>
             </button>
           );
         })}
