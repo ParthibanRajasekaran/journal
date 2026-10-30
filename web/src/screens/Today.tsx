@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useState } from "react";
 import { api, DaySummary, Meal } from "../api";
 import { addDays, formatDay, timeOf, utcDay } from "../dates";
 
@@ -36,72 +36,81 @@ export function Today({ day, onDayChange, onAdd }: Props) {
   const isToday = day === utcDay();
   return (
     <>
-      <div className="row">
-        <button onClick={() => onDayChange(addDays(day, -1))} aria-label="Previous day">‹</button>
-        <h1 style={{ fontSize: 18, textAlign: "center" }}>{isToday ? "Today" : formatDay(day)}</h1>
-        <button onClick={() => onDayChange(addDays(day, 1))} aria-label="Next day" disabled={isToday}>›</button>
+      <div className="row" style={{ marginBottom: 6 }}>
+        <button className="ghost icon-btn" onClick={() => onDayChange(addDays(day, -1))} aria-label="Previous day">‹</button>
+        <h1 style={{ margin: 0, fontSize: 18, textAlign: "center" }}>{isToday ? "Today" : formatDay(day)}</h1>
+        <button className="ghost icon-btn" onClick={() => onDayChange(addDays(day, 1))} aria-label="Next day" disabled={isToday}>›</button>
       </div>
 
       {error && <p className="error" role="alert">{error}</p>}
-      {summary && <SummaryCard summary={summary} />}
 
-      {summary &&
-        MEAL_ORDER.map((type) => {
-          const meals = summary.meals.filter((m) => m.meal_type === type);
-          return (
-            <section key={type}>
-              <h2 style={{ textTransform: "capitalize" }}>{type}</h2>
-              {meals.length === 0 ? (
-                <p className="muted">Nothing logged.</p>
-              ) : (
-                <ul className="plain card">
-                  {meals.map((meal) => (
-                    <li key={meal.id} className="row">
-                      <span>
-                        <strong>{meal.name}</strong>
-                        <span className="muted"> · {timeOf(meal.eaten_at)} · {Math.round(meal.calories)} kcal</span>
-                      </span>
-                      <button className="danger" onClick={() => remove(meal)} aria-label={`Delete ${meal.name}`}>Delete</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-
-      <button className="primary" style={{ width: "100%", marginTop: 12 }} onClick={onAdd}>Add meal</button>
+      {summary ? (
+        <div className="today-grid">
+          <section>
+            <SummaryCard summary={summary} />
+            <button className="primary" style={{ width: "100%", marginBottom: 14 }} onClick={onAdd}>Add meal</button>
+          </section>
+          <section>
+            {MEAL_ORDER.map((type) => {
+              const meals = summary.meals.filter((m) => m.meal_type === type);
+              return (
+                <div key={type}>
+                  <h2>{type}</h2>
+                  {meals.length === 0 ? (
+                    <p className="muted" style={{ margin: "0 0 8px" }}>Nothing logged yet.</p>
+                  ) : (
+                    <ul className="meal-group">
+                      {meals.map((meal) => (
+                        <li key={meal.id} className="meal-item">
+                          <span>
+                            <strong>{meal.name}</strong>
+                            <span className="muted"> · {timeOf(meal.eaten_at)} · <span className="num">{Math.round(meal.calories)}</span> kcal</span>
+                          </span>
+                          <button className="ghost" onClick={() => remove(meal)} aria-label={`Delete ${meal.name}`}>Delete</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        </div>
+      ) : (
+        <div className="skeleton" aria-label="Loading day" />
+      )}
     </>
   );
 }
 
 function SummaryCard({ summary }: { summary: DaySummary }) {
   const target = summary.targets.calories;
-  const remaining = target === null ? null : Math.round(target - summary.calories);
+  const left = target === null ? null : Math.round(target - summary.calories);
+  const over = left !== null && left < 0;
+  const pct = target ? Math.min(100, (summary.calories / target) * 100) : 0;
   return (
-    <section className="card" aria-label="Day summary">
-      <div className="row">
+    <section className="card hero" aria-label="Day summary">
+      <div
+        className={`ring ${over ? "over" : ""}`}
+        style={{ "--p": pct } as CSSProperties}
+        role="img"
+        aria-label={left === null ? `${Math.round(summary.calories)} kcal eaten` : `${Math.abs(left)} kcal ${over ? "over" : "left"}`}
+      >
         <div>
-          <div style={{ fontSize: 28, fontWeight: 600 }}>{Math.round(summary.calories)}</div>
-          <div className="muted">kcal eaten{target !== null ? ` of ${target}` : ""}</div>
+          <div className="big">{left === null ? Math.round(summary.calories) : Math.abs(left)}</div>
+          <div className="small">{left === null ? "kcal eaten" : over ? "kcal over" : "kcal left"}</div>
         </div>
-        {remaining !== null && (
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 20, fontWeight: 600 }}>{remaining >= 0 ? remaining : 0}</div>
-            <div className="muted">{remaining >= 0 ? "kcal left" : "kcal over"}</div>
-          </div>
-        )}
       </div>
-      {target !== null && <Bar value={summary.calories} goal={target} />}
-      {summary.targets.protein_g !== null && (
-        <>
-          <div className="muted">Protein {Math.round(summary.protein_g)} g of {summary.targets.protein_g} g</div>
-          <Bar value={summary.protein_g} goal={summary.targets.protein_g} />
-        </>
-      )}
-      {summary.targets.calories === null && (
-        <p className="muted">Set your daily targets in Settings to see what's left.</p>
-      )}
+      <div style={{ width: "100%" }}>
+        <div className="muted num">{Math.round(summary.calories)} of {target ?? "–"} kcal</div>
+        {summary.targets.protein_g !== null && (
+          <>
+            <div className="muted num" style={{ marginTop: 14 }}>Protein {Math.round(summary.protein_g)} of {summary.targets.protein_g} g</div>
+            <Bar value={summary.protein_g} goal={summary.targets.protein_g} />
+          </>
+        )}
+        {target === null && <p className="muted">Set daily targets in Settings to see what's left.</p>}
+      </div>
     </section>
   );
 }

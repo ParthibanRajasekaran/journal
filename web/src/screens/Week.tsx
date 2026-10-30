@@ -28,12 +28,12 @@ export function Week({ onOpenDay }: Props) {
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       {days && (
-        <ul className="plain card">
+        <ul className="week-grid" style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {days.map((day) => (
-            <li key={day.date}>
-              <button className="row" style={{ width: "100%", border: 0, background: "none", padding: 0, minHeight: 44 }} onClick={() => onOpenDay(day.date)}>
-                <span>{formatDay(day.date).split(" ").slice(0, 2).join(" ")}</span>
-                <span className="muted">
+            <li key={day.date} className="card" style={{ margin: 0, padding: 0 }}>
+              <button className="day-tile" onClick={() => onOpenDay(day.date)}>
+                <span className="date">{formatDay(day.date).split(" ").slice(0, 2).join(" ")}</span>
+                <span className="muted" style={{ display: "block", marginTop: 6 }}>
                   {day.meal_count === 0 ? "No meals" : `${day.meal_count} meal${day.meal_count === 1 ? "" : "s"} · ${Math.round(day.calories)} kcal`}
                 </span>
               </button>
