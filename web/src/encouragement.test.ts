@@ -18,7 +18,7 @@ describe("proteinTier", () => {
 describe("savedLine", () => {
   it("names the tier reached, and stays calm below 80%", () => {
     expect(savedLine(100, 100)).toContain("protein goal for today");
-    expect(savedLine(90, 100)).toContain("nearly at your protein goal");
+    expect(savedLine(90, 100)).toContain("close to your protein goal");
     expect(savedLine(80, 100)).toBe("Good progress on protein today.");
     expect(savedLine(40, 100)).toBe("Logged. Nice work keeping track.");
   });
@@ -44,7 +44,7 @@ describe("weekLines", () => {
     expect(weekLines(week, 100)).toEqual([
       "You logged on 6 of 7 days.",
       "Amazing: you reached your protein goal on 2 days.",
-      "Great: you were nearly at your protein goal on 1 day.",
+      "Great: you were close to your protein goal on 1 day.",
       "Good: you made solid protein progress on 1 day.",
     ]);
   });

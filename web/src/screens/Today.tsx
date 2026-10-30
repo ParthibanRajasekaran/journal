@@ -3,10 +3,9 @@ import { api, DaySummary, Meal } from "../api";
 import { EditMeal } from "./EditMeal";
 import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
-import { savedLine, proteinTier } from "../encouragement";
+import { savedLine } from "../encouragement";
 import { Hand, Heart, ThumbsUp, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import confetti from "canvas-confetti";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack", "other"];
 
@@ -34,19 +33,10 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   // The confirmation fades on its own, and a tap dismisses it.
   useEffect(() => {
     if (!showSaved || !summary) return;
-    const timer = setTimeout(() => setShowSaved(false), 3500);
+    const timer = setTimeout(() => setShowSaved(false), 4000);
     return () => clearTimeout(timer);
   }, [showSaved, summary]);
 
-  // A small burst only when the protein goal is reached, and never with reduced motion.
-  const amazing = summary !== null && proteinTier(summary.protein_g, summary.targets.protein_g) === "amazing";
-  useEffect(() => {
-    if (showSaved && summary && amazing && !reduceMotion) {
-      void confetti({ particleCount: 80, spread: 70, origin: { y: 0.3 } });
-    }
-    // Fire once when the note first appears, not on every re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSaved, summary?.protein_g]);
 
   const load = useCallback(() => {
     setError(null);

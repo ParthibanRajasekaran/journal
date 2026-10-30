@@ -22,7 +22,7 @@ export function savedLine(protein: number, target: number | null): string {
     case "amazing":
       return "Amazing! You've reached your protein goal for today.";
     case "great":
-      return "Great! You're nearly at your protein goal.";
+      return "Great! You're close to your protein goal.";
     case "good":
       return "Good progress on protein today.";
     default:
@@ -42,7 +42,7 @@ export function weekLines(days: { meal_count: number; protein_g: number }[], tar
 
   const lines = [`You logged on ${logged} of ${days.length} days.`];
   if (amazing > 0) lines.push(`Amazing: you reached your protein goal on ${amazing} ${amazing === 1 ? "day" : "days"}.`);
-  if (great > 0) lines.push(`Great: you were nearly at your protein goal on ${great} ${great === 1 ? "day" : "days"}.`);
+  if (great > 0) lines.push(`Great: you were close to your protein goal on ${great} ${great === 1 ? "day" : "days"}.`);
   if (good > 0) lines.push(`Good: you made solid protein progress on ${good} ${good === 1 ? "day" : "days"}.`);
   return lines;
 }
