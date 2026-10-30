@@ -146,11 +146,10 @@ input[type="checkbox"] { width: 20px; min-width: 20px; min-height: 20px; height:
 .ring > div { position: relative; text-align: center; }
 .ring .big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .ring .small { font-size: 13px; color: var(--muted); }
-.ring.over { background: conic-gradient(var(--alert) 100%, transparent 0); box-shadow: 0 18px 36px -22px rgba(180, 83, 9, 0.6); }
+/* Going over a target is shown as plain fact in the text, never as a warning colour. */
 
 .bar { height: 6px; background: rgba(15, 23, 42, 0.08); border-radius: 6px; overflow: hidden; margin: 8px 0 14px; }
 .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #0ea5e9); border-radius: 6px; transition: width 900ms var(--ease); }
-.bar > span.over { background: var(--alert); }
 
 /* Meals */
 .meal-group { list-style: none; padding: 0; margin: 0; }
