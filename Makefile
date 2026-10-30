@@ -4,7 +4,8 @@
 # Local PostgreSQL used by database tests. CI overrides PG_PORT=5432 with a service container.
 PG_HOST ?= 127.0.0.1
 PG_PORT ?= 5433
-export JOURNAL_TEST_DATABASE_URL ?= postgresql+asyncpg://$(PG_HOST):$(PG_PORT)/journal_test
+PG_USER ?= $(shell whoami)
+export JOURNAL_TEST_DATABASE_URL ?= postgresql+asyncpg://$(PG_USER)@$(PG_HOST):$(PG_PORT)/journal_test
 
 .PHONY: check preflight lint typecheck test policy secrets audit hooks db-setup web
 
