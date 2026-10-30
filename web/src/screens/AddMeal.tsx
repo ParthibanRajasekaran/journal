@@ -202,11 +202,21 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
             onChange={(e) => setDescribing(e.target.value)}
             placeholder="e.g. 4 poori with 5 spoons of paneer butter masala"
           />
-          <button type="button" className="primary" onClick={() => estimate()} disabled={estimating}>
-            {estimating ? "Working…" : "Estimate"}
+          <button
+            type="button"
+            className={hasEstimate ? "ghost" : "primary"}
+            onClick={() => estimate()}
+            disabled={estimating}
+          >
+            {estimating ? "Working…" : hasEstimate ? "Re-estimate" : "Estimate"}
           </button>
         </div>
         {estimateError && <p className="error" role="alert">{estimateError}</p>}
+        {!hasEstimate && !manual && (
+          <button type="button" className="ghost other-link" onClick={() => setManual(true)}>
+            Enter the numbers myself
+          </button>
+        )}
 
         {questions && (
           <div className="questions" role="group" aria-label="Quick questions" ref={questionsRef}>
@@ -303,12 +313,6 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         </>
       )}
 
-      {!hasEstimate && !manual && (
-        <button type="button" className="ghost other-link" onClick={() => setManual(true)}>
-          Enter the numbers myself
-        </button>
-      )}
-
       {error && <p className="error" role="alert">{error}</p>}
 
       {confirmCancel ? (
@@ -321,9 +325,14 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         </div>
       ) : (
         <div className="form-actions">
-          {!hasEstimate && !manual && <p className="hint muted">Estimate a meal or enter the numbers first.</p>}
+          {!hasEstimate && !manual && <p id="save-hint" className="hint muted">Estimate a meal or enter the numbers first.</p>}
           <button type="button" className="ghost" onClick={cancel}>Cancel</button>
-          <button type="submit" className="primary" disabled={saving || (!hasEstimate && !manual)}>
+          <button
+            type="submit"
+            className="primary"
+            disabled={saving || (!hasEstimate && !manual)}
+            aria-describedby={!hasEstimate && !manual ? "save-hint" : undefined}
+          >
             {saving ? "Saving…" : "Save meal"}
           </button>
         </div>

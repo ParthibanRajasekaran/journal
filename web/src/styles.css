@@ -252,14 +252,12 @@ nav.tabs a.tab-add { color: var(--accent-ink); background: var(--accent); font-w
 @keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 /* Wide layouts: use the width on desktop instead of one narrow column */
-.settings-grid, .form-grid, .macro-grid { display: grid; gap: 16px; }
-.settings-grid > div, .form-grid > div { min-width: 0; }
+.settings-grid, .macro-grid { display: grid; gap: 16px; }
+.settings-grid > div { min-width: 0; }
 .add-form { max-width: 880px; margin: 0 auto; }
-.span-2 { grid-column: 1 / -1; }
+.add-form:hover { border-color: var(--line); }
 .macro-grid { grid-template-columns: repeat(2, 1fr); }
 @media (min-width: 768px) {
-  .form-grid { grid-template-columns: 2fr 1fr 1fr; align-items: end; }
-  .form-grid .span-2 { grid-column: 1 / -1; }
   .macro-grid { grid-template-columns: repeat(4, 1fr); }
 }
 @media (min-width: 1024px) {
@@ -277,9 +275,6 @@ nav.tabs a.tab-add { color: var(--accent-ink); background: var(--accent); font-w
 .estimate-row { display: flex; gap: 10px; align-items: stretch; }
 .estimate-row textarea { flex: 1; font: inherit; color: var(--text); background: var(--surface); border: 1px solid #6b7280; border-radius: 12px; padding: 10px 14px; resize: vertical; min-height: 48px; }
 .estimate-row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.16); }
-.other-time { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.other-time span { color: var(--muted); font-size: 14px; }
-.other-time input { width: auto; min-width: 140px; }
 .other-link { margin-top: 6px; min-height: 36px; font-size: 14px; }
 
 /* Sign-in page */
@@ -309,14 +304,11 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 
 /* Simpler Add meal */
 .meal-line { margin: 14px 0 4px; }
-.meal-summary { min-height: 40px; padding: 0 12px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .result { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
 .result-label { margin: 0 0 2px; font-size: 13px; }
 .result-name { border: 0; padding: 0; min-height: 0; font-weight: 600; font-size: 16px; background: transparent; box-shadow: none; }
 .result-name:focus { box-shadow: none; outline: none; border-bottom: 1px solid var(--accent); border-radius: 0; }
-.big-kcal { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
-.macro-line { font-size: 14px; margin-top: 2px; }
 .manual-name { margin-top: 12px; }
 
 /* Connect an AI account, inline in Add meal */
@@ -327,17 +319,36 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 .key-form { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 12px; }
 
 
+/* When: time and meal in one group (a native radio group styled as segments) */
+.when { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
+.when legend { font-size: 14px; color: var(--muted); padding: 0; margin-bottom: 8px; letter-spacing: 0.02em; }
+.when-time { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.when-time span { color: var(--muted); font-size: 14px; }
+.when-time input { width: auto; min-width: 150px; }
+.segments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.segment {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  min-height: 44px; margin: 0; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 12px;
+  background: var(--surface); color: var(--text); cursor: pointer; font-weight: 500;
+  transition: background 180ms var(--ease), color 180ms var(--ease), border-color 180ms var(--ease);
+}
+.segment:hover { border-color: var(--accent); }
+.segment input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; min-height: 0; padding: 0; }
+.segment:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.segment-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+@media (max-width: 379px) { .segments { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 479px) {
+  .estimate-row { flex-direction: column; }
+  .estimate-row button { width: 100%; }
+}
+
 /* Time picker: animated chips */
-.time-picker { margin-top: 6px; }
-.label-text { display: block; font-size: 14px; color: var(--muted); margin: 14px 0 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
-  min-height: 40px; padding: 0 14px; border-radius: 999px; flex-direction: column; line-height: 1.1; gap: 2px;
-  transition: background 320ms var(--ease), color 320ms var(--ease), transform 220ms var(--spring), box-shadow 320ms var(--ease);
+  min-height: 44px; padding: 0 14px; border-radius: 999px;
+  transition: background 180ms var(--ease), color 180ms var(--ease), box-shadow 180ms var(--ease);
 }
-.chip small { font-size: 12px; color: var(--muted); }
-.chip.chip-on, .provider-btn.chip-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: var(--glow); transform: translateY(-1px); }
-.chip.chip-on small { color: #ffffff; }
+.chip.chip-on, .provider-btn.chip-on { background: var(--accent); color: var(--accent-ink); border-color: transparent; box-shadow: var(--glow); }
 .provider-btn.chip-on:hover { color: var(--accent-ink); }
 .meal-actions { display: flex; gap: 4px; flex: none; }
 .meal-confirm { width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
@@ -348,7 +359,6 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 .empty-day p { margin: 0 0 12px; color: var(--muted); }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
 .form-actions .hint { flex-basis: 100%; text-align: right; margin: 0; font-size: 14px; }
-.time-manual { margin-top: 10px; max-width: 200px; }
 fieldset.question { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; min-width: 0; background: var(--surface); }
 fieldset.question legend { font-weight: 600; padding: 0 6px; }
 .questions { margin-top: 12px; display: grid; gap: 10px; }

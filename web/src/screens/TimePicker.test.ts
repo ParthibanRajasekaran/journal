@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { mealFor, nowRounded } from "./TimePicker";
+import { mealFor, nowRounded, timeFor } from "./TimePicker";
+
+describe("timeFor", () => {
+  it("keeps a typed time that already falls in the picked meal", () => {
+    expect(timeFor("lunch", "12:40")).toBe("12:40");
+  });
+
+  it("moves to the meal's usual time when the typed time is outside it", () => {
+    expect(timeFor("dinner", "09:00")).toBe("19:30");
+  });
+});
 
 describe("nowRounded", () => {
   it("rounds to the nearest 5 minutes", () => {

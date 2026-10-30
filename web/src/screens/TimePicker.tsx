@@ -1,11 +1,18 @@
 import { Meal } from "../api";
 
-// Quick shortcuts for the usual times. The default is the current time, so these are optional.
-const SHORTCUTS: { type: Meal["meal_type"]; label: string; time: string }[] = [
-  { type: "breakfast", label: "Breakfast", time: "08:00" },
-  { type: "lunch", label: "Lunch", time: "13:00" },
-  { type: "snack", label: "Snack", time: "16:30" },
-  { type: "dinner", label: "Dinner", time: "19:30" },
+// The time a meal gets when the user picks it and the current time is outside its window.
+const DEFAULT_TIME: Record<Meal["meal_type"], string> = {
+  breakfast: "08:00",
+  lunch: "13:00",
+  snack: "16:30",
+  dinner: "19:30",
+};
+
+const MEALS: { type: Meal["meal_type"]; label: string }[] = [
+  { type: "breakfast", label: "Breakfast" },
+  { type: "lunch", label: "Lunch" },
+  { type: "snack", label: "Snack" },
+  { type: "dinner", label: "Dinner" },
 ];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -17,7 +24,7 @@ export function nowRounded(now: Date = new Date()): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-// The meal a time of day usually belongs to. The user can change it with one tap.
+// The meal a time of day usually belongs to.
 export function mealFor(time: string): Meal["meal_type"] {
   const hour = Number(time.slice(0, 2));
   if (hour < 10) return "breakfast";
@@ -26,17 +33,23 @@ export function mealFor(time: string): Meal["meal_type"] {
   return "dinner";
 }
 
+// Time is the single source of truth. Picking a meal keeps the time if it already falls in that
+// meal's window, so a choice never overwrites a time the user just typed.
+export function timeFor(meal: Meal["meal_type"], current: string): string {
+  return mealFor(current) === meal ? current : DEFAULT_TIME[meal];
+}
+
 interface Props {
   mealType: Meal["meal_type"];
   time: string;
   onChange: (choice: { mealType: Meal["meal_type"]; time: string }) => void;
 }
 
-// The time is always visible and editable. Changing it suggests the meal; a shortcut sets both.
 export function MealTimePicker({ mealType, time, onChange }: Props) {
   return (
-    <div className="time-picker">
-      <label className="other-time">
+    <fieldset className="when">
+      <legend>When</legend>
+      <label className="when-time">
         <span>Time</span>
         <input
           type="time"
@@ -47,24 +60,23 @@ export function MealTimePicker({ mealType, time, onChange }: Props) {
           }}
         />
       </label>
-      <span className="label-text">Meal</span>
-      <div className="chips" role="radiogroup" aria-label="Meal">
-        {SHORTCUTS.map((m) => {
+      <div className="segments">
+        {MEALS.map((m) => {
           const on = m.type === mealType;
           return (
-            <button
-              key={m.type}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              className={`chip ${on ? "chip-on" : ""}`}
-              onClick={() => onChange({ mealType: m.type, time: m.time })}
-            >
+            <label key={m.type} className={`segment ${on ? "segment-on" : ""}`}>
+              <input
+                type="radio"
+                name="meal"
+                value={m.type}
+                checked={on}
+                onChange={() => onChange({ mealType: m.type, time: timeFor(m.type, time) })}
+              />
               <span>{m.label}</span>
-            </button>
+            </label>
           );
         })}
       </div>
-    </div>
+    </fieldset>
   );
 }
