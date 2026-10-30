@@ -169,6 +169,15 @@ paths:
                 $ref: '#/components/schemas/Profile'
         '422':
           $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - &id001
+        $ref: '#/components/parameters/JournalRequest'
     delete:
       tags:
       - Me
@@ -177,6 +186,12 @@ paths:
       responses:
         '204':
           description: Deleted
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+      parameters:
+      - *id001
   /me/ai-provider:
     get:
       tags:
@@ -351,7 +366,7 @@ paths:
       - Meals
       operationId: createMeal
       parameters:
-      - &id001
+      - &id002
         $ref: '#/components/parameters/JournalRequest'
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -407,6 +422,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DaySummary'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /week:
     get:
       tags:
@@ -430,6 +449,10 @@ paths:
                 maxItems: 7
                 items:
                   $ref: '#/components/schemas/DayTotals'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /sync:
     post:
       tags:
@@ -524,7 +547,7 @@ paths:
       operationId: updateMeal
       description: Requires If-Match with the current version.
       parameters:
-      - *id001
+      - *id002
       - name: If-Match
         in: header
         required: true
@@ -571,7 +594,7 @@ paths:
         '422':
           $ref: '#/components/responses/Problem'
       parameters:
-      - *id001
+      - *id002
 components:
   securitySchemes:
     bearerAuth:

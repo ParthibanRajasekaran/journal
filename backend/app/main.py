@@ -7,7 +7,7 @@ from app.auth.google import JWKS_URL
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_session_factory
 from app.errors import install_problem_handlers
-from app.routes import auth, health, me, meals
+from app.routes import auth, days, health, me, meals
 
 API_PREFIX = "/api/v1"
 
@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(auth.router)
     api.include_router(me.router)
     api.include_router(meals.router)
+    api.include_router(days.router)
     app.include_router(api)
     return app
 

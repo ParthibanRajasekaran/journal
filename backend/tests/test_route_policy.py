@@ -24,6 +24,10 @@ PROTECTED_API_ROUTES = {
     (f"{API_PREFIX}/meals/{{meal_id}}", "get"),
     (f"{API_PREFIX}/meals/{{meal_id}}", "patch"),
     (f"{API_PREFIX}/meals/{{meal_id}}", "delete"),
+    (f"{API_PREFIX}/me", "patch"),
+    (f"{API_PREFIX}/me", "delete"),
+    (f"{API_PREFIX}/days/{{date}}", "get"),
+    (f"{API_PREFIX}/week", "get"),
 }
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
@@ -60,7 +64,7 @@ def test_protected_route_refuses_anonymous_callers(
     client: TestClient, path: str, method: str
 ) -> None:
     headers = {"X-Journal-Request": "1", "Idempotency-Key": str(uuid.uuid4()), "If-Match": "1"}
-    concrete = path.replace("{meal_id}", "meal_does_not_exist")
+    concrete = path.replace("{meal_id}", "meal_does_not_exist").replace("{date}", "2026-10-29")
     body = {
         "client_id": str(uuid.uuid4()),
         "meal_type": "lunch",
@@ -72,6 +76,10 @@ def test_protected_route_refuses_anonymous_callers(
         "fat_g": 5,
         "source": "manual",
     }
+    if path.endswith("/me") and method == "patch":
+        body = {"display_name": "Someone"}
+    if path.endswith("/week"):
+        concrete = f"{path}?start=2026-10-26"
     response = client.request(method.upper(), concrete, headers=headers, json=body)
     assert response.status_code == 401
     assert response.headers["content-type"].startswith("application/problem+json")
