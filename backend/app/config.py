@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     oauth_state_ttl_seconds: int = 600
 
+    # Encrypts stored provider keys. 32 random bytes, base64. Never stored in the database.
+    key_encryption_key: SecretStr | None = None
+
     # Abuse limits (per signed-in user). A burst of this many writes is allowed, then it refills.
     write_requests_per_minute: int = 30
     meals_per_day: int = 300

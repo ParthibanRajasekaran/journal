@@ -28,6 +28,9 @@ PROTECTED_API_ROUTES = {
     (f"{API_PREFIX}/me", "delete"),
     (f"{API_PREFIX}/days/{{date}}", "get"),
     (f"{API_PREFIX}/week", "get"),
+    (f"{API_PREFIX}/me/ai-keys", "get"),
+    (f"{API_PREFIX}/me/ai-keys/{{provider}}", "put"),
+    (f"{API_PREFIX}/me/ai-keys/{{provider}}", "delete"),
 }
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
@@ -64,7 +67,11 @@ def test_protected_route_refuses_anonymous_callers(
     client: TestClient, path: str, method: str
 ) -> None:
     headers = {"X-Journal-Request": "1", "Idempotency-Key": str(uuid.uuid4()), "If-Match": "1"}
-    concrete = path.replace("{meal_id}", "meal_does_not_exist").replace("{date}", "2026-10-29")
+    concrete = (
+        path.replace("{meal_id}", "meal_does_not_exist")
+        .replace("{date}", "2026-10-29")
+        .replace("{provider}", "openai")
+    )
     body = {
         "client_id": str(uuid.uuid4()),
         "meal_type": "lunch",
@@ -78,6 +85,8 @@ def test_protected_route_refuses_anonymous_callers(
     }
     if path.endswith("/me") and method == "patch":
         body = {"display_name": "Someone"}
+    if path.endswith("/ai-keys/openai") and method == "put":
+        body = {"api_key": "sk-" + "a" * 30, "acknowledge_provider_terms": True}
     if path.endswith("/week"):
         concrete = f"{path}?start=2026-10-26"
     response = client.request(method.upper(), concrete, headers=headers, json=body)

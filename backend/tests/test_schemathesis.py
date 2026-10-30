@@ -54,6 +54,11 @@ _real_app = create_app(
         google_client_secret=SecretStr("test-client-secret"),
     )
 )
+from tests.conftest import TEST_KEY_B64  # noqa: E402
+from tests.test_ai_keys import FakeChecker  # noqa: E402
+
+_real_app.state.key_checker = FakeChecker()  # never call real providers from generated tests
+_real_app.state.settings.key_encryption_key = SecretStr(TEST_KEY_B64)
 _host = _contract_host(_real_app)
 schema = from_asgi("/_contract.json", _host).include(
     operation_id=_implemented_operation_ids(_real_app)

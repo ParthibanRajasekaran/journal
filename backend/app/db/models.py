@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     UniqueConstraint,
@@ -111,3 +112,21 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AiKey(Base):
+    """A user's own provider key, encrypted. The plaintext never reaches the database."""
+
+    __tablename__ = "ai_keys"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="user_provider"),)
+
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("aik"))
+    user_id: Mapped[str] = mapped_column(
+        String(48), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(16))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    last4: Mapped[str] = mapped_column(String(4))
+    validated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

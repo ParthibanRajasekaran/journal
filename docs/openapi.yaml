@@ -605,6 +605,77 @@ paths:
           $ref: '#/components/responses/Problem'
       parameters:
       - *id002
+  /me/ai-keys:
+    get:
+      tags:
+      - AI keys
+      operationId: listAiKeys
+      summary: List saved provider keys (never the key itself)
+      responses:
+        '200':
+          description: Saved keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AiKeyStatus'
+        '401': &id003
+          $ref: '#/components/responses/Problem'
+  /me/ai-keys/{provider}:
+    parameters:
+    - name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - openai
+        - anthropic
+        - gemini
+    put:
+      tags:
+      - AI keys
+      operationId: saveAiKey
+      summary: Check a provider key and store it encrypted
+      description: The key is checked with one read-only provider call before it is stored. The key is never returned.
+      parameters:
+      - &id004
+        $ref: '#/components/parameters/JournalRequest'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiKeySave'
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiKeyStatus'
+        '401': *id003
+        '403': *id003
+        '422': *id003
+        '429': *id003
+        '503': *id003
+        '400':
+          $ref: '#/components/responses/Problem'
+    delete:
+      tags:
+      - AI keys
+      operationId: deleteAiKey
+      summary: Remove a saved provider key
+      parameters:
+      - *id004
+      responses:
+        '204':
+          description: Removed
+        '401': *id003
+        '403': *id003
+        '404': *id003
+        '429': *id003
 components:
   securitySchemes:
     bearerAuth:
@@ -1121,3 +1192,38 @@ components:
                 type: integer
               problem:
                 $ref: '#/components/schemas/Problem'
+    AiKeyStatus:
+      type: object
+      required:
+      - provider
+      - last4
+      - validated_at
+      properties:
+        provider:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - gemini
+        last4:
+          type: string
+          minLength: 4
+          maxLength: 4
+        validated_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+    AiKeySave:
+      type: object
+      required:
+      - api_key
+      - acknowledge_provider_terms
+      properties:
+        api_key:
+          type: string
+          minLength: 20
+          maxLength: 300
+        acknowledge_provider_terms:
+          type: boolean
+          const: true
+      additionalProperties: false
