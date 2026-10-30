@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
 import { localDay } from "../dates";
 import { defaultMealFor, MealTimePicker, usualTime } from "./TimePicker";
+import { KeyHelp } from "./KeyHelp";
 
 interface Props {
   day: string;
@@ -27,6 +28,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
 
   const [describing, setDescribing] = useState("");
+  const [needsKey, setNeedsKey] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [questions, setQuestions] = useState<EstimateQuestion[] | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -57,13 +59,15 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
 
   async function estimate(withAnswers?: SuppliedAnswer[]) {
     setError(null);
+    setNeedsKey(false);
     if (!withAnswers && describing.trim().length < 3) return setError("Describe what you ate first.");
     setEstimating(true);
     try {
       applyEstimate(await api.estimate(describing.trim(), withAnswers));
     } catch (err) {
       const e = err as ApiError;
-      setError(e.status === 409 ? "Add your AI key in Settings to estimate meals." : e.message);
+      if (e.status === 409) setNeedsKey(true);
+      else setError(e.message);
     } finally {
       setEstimating(false);
     }
@@ -209,6 +213,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
           </div>
         )}
       </div>
+
+      {needsKey && <KeyHelp onSaved={() => void estimate()} />}
 
       <div className="meal-line">
         {pickingMeal ? (
