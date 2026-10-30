@@ -39,6 +39,12 @@ processors:
         action: delete
       - key: user.email
         action: delete
+  # Log lines from files carry no service name, so Loki needs one to label the stream.
+  resource/api_logs:
+    attributes:
+      - key: service.name
+        value: journal-api
+        action: upsert
   batch:
     timeout: 10s
 
@@ -63,5 +69,5 @@ service:
       exporters: [prometheus]
     logs:
       receivers: [filelog]
-      processors: [memory_limiter, filter/api_logs, batch]
+      processors: [memory_limiter, filter/api_logs, resource/api_logs, batch]
       exporters: [otlphttp/loki]
