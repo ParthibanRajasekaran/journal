@@ -54,16 +54,27 @@ export function KeyHelp({ onSaved }: Props) {
       <p className="key-help-title">Connect your AI account to estimate meals</p>
       <p className="muted">Pick the account you already use. Create a key there, then paste it below. Journal stores it encrypted and never shows it again.</p>
 
+      <fieldset className="segment-set">
+        <legend>Which account do you use?</legend>
+        <div className="segments">
+          {PROVIDERS.map((p) => (
+            <label key={p.id} className={`segment ${provider === p.id ? "segment-on" : ""}`}>
+              <input
+                type="radio"
+                name="ai-account"
+                value={p.id}
+                checked={provider === p.id}
+                onChange={() => setProvider(p.id)}
+              />
+              <span>{p.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <div className="provider-buttons">
         {PROVIDERS.map((p) => (
-          <a
-            key={p.id}
-            className={`button provider-btn ${provider === p.id ? "chip-on" : ""}`}
-            href={p.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setProvider(p.id)}
-          >
+          <a key={p.id} className="button provider-btn" href={p.url} target="_blank" rel="noopener noreferrer">
             Get a {p.label} key ↗
           </a>
         ))}
