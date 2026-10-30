@@ -17,7 +17,7 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 | 0 | Quality gates (`make check`, pre-commit, CI) | Done | Platform | Verified: gates fail on broken spec, leaked key, oversized file |
 | 2 | Policy-as-code (`policy/`) | Estimate policy tested (10/10); authz and consent untested | Security | Tests for authz and consent land with steps 3, 4, 6 |
 | 1 | API skeleton: `/api/v1/health`, RFC 9457 errors, route policy, contract drift, Schemathesis | Done | Backend | 79 tests; Schemathesis verified to fail on a contract-breaking response |
-| 4 | Deployment (test): Oracle VM, hardening, Docker, Caddy HTTPS at journal.getrendercheck.com | Live, no real user data | Platform | Health check passes over HTTPS; docs hidden; security headers set. Not for real data until sign-in and per-user access are built |
+| 4 | Deployment (test): Oracle VM, hardening, Docker, Caddy HTTPS at journal.getrendercheck.com | Live, no real user data | Platform | Backups: nightly encrypted dump to Cloudflare R2 (EU), 14-day retention, restore tested 2026-10-30. Disk alert hourly via ntfy at 80%. Cloudflare proxy deferred (option 2): DNS stays on Vercel. Write limits: 30 writes/min per user, 300 meals/day, 64 KB request cap. Health check passes over HTTPS; docs hidden; security headers set. Not for real data until sign-in and per-user access are built |
 | 2 | Database and migrations: users and meals tables, Alembic, constraints | Done | Backend | 17 database tests on PostgreSQL 18; models and migrations checked for drift; PostgreSQL 18 runs on port 5433 (started by hand; it does not restart after reboot) |
 | 2 | Mobile and web shell (Capacitor) | Not started | | Blocked on ADR acceptance |
 | 3 | Eval set (150 labelled meals) | Not started | | Needed for ADR-005 drift gate |
@@ -46,3 +46,11 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 2. Accept or amend ADR-001 to ADR-006; mark each Accepted with a date.
 3. Install OPA and run the policy tests.
 4. Write the eval set before any AI adapter is merged.
+
+
+## Operations status (2026-10-30)
+
+- Backups: `ops/backup.sh` runs at 03:15 UTC via cron on the server. Encrypted dumps in the `journal-backups` R2 bucket (EU). Restore tested into a scratch database.
+- Disk alert: `ops/disk-check.sh` runs hourly. Notifies through ntfy when the root disk passes 80%. Subscribe to the topic on the owner's phone.
+- Edge protection: Cloudflare proxy deferred. The DNS would need to move from Vercel to Cloudflare. Revisit before public launch.
+- Open: the AI provider decision (bring-your-own-key design is written up in chat, not yet built).
