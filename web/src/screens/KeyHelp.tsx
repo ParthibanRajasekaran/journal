@@ -3,9 +3,10 @@ import { api, ApiError, Provider } from "../api";
 
 // Where each provider creates a key. We cannot fetch the key for the user: the provider only shows
 // it in its own console, so the user copies it back here.
-const PROVIDERS: { id: Provider; label: string; url: string; prefix: string }[] = [
+// Claude's console address has changed over time, so this links to Anthropic's own getting-started page.
+export const PROVIDERS: { id: Provider; label: string; url: string; prefix: string }[] = [
   { id: "openai", label: "OpenAI", url: "https://platform.openai.com/api-keys", prefix: "sk-" },
-  { id: "anthropic", label: "Claude", url: "https://console.anthropic.com/settings/keys", prefix: "sk-ant-" },
+  { id: "anthropic", label: "Claude", url: "https://docs.anthropic.com/en/api/getting-started", prefix: "sk-ant-" },
   { id: "gemini", label: "Gemini", url: "https://aistudio.google.com/app/apikey", prefix: "AIza" },
 ];
 

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useId, useState } from "react";
 import { api, AiKeyStatus, Profile, Provider } from "../api";
+import { PROVIDERS as KEY_PAGES } from "./KeyHelp";
 
 interface Props {
   profile: Profile;
@@ -158,6 +159,13 @@ function AddKey({ onSaved }: { onSaved: () => void }) {
 
   return (
     <form onSubmit={submit} style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 12 }}>
+      <div className="provider-buttons">
+        {KEY_PAGES.map((p) => (
+          <a key={p.id} className="button provider-btn" href={p.url} target="_blank" rel="noopener noreferrer">
+            Get a {p.label} key ↗
+          </a>
+        ))}
+      </div>
       <label htmlFor="ai-provider">Provider</label>
       <select id="ai-provider" value={provider} onChange={(e) => setProvider(e.target.value as Provider)}>
         {PROVIDERS.map((p) => (
