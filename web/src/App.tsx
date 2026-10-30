@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError, Profile } from "./api";
 import { SignIn } from "./screens/SignIn";
 import { Today } from "./screens/Today";
@@ -27,6 +27,20 @@ export function App() {
         setProfile(signedOut ? null : "error");
       });
   }, [attempt]);
+
+  // When the screen changes (for example after Save), move focus to its heading rather than the page top.
+  const firstScreen = useRef(true);
+  useEffect(() => {
+    if (firstScreen.current) {
+      firstScreen.current = false;
+      return;
+    }
+    const heading = document.querySelector<HTMLElement>("main.shell h1");
+    if (heading) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus();
+    }
+  }, [screen.name]);
 
   if (profile === "loading") {
     return (

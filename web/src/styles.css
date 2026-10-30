@@ -312,6 +312,7 @@ button.danger-solid { background: #b91c1c; color: #fff; border-color: transparen
 .meal-summary { min-height: 40px; padding: 0 12px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .result { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.result-label { margin: 0 0 2px; font-size: 13px; }
 .result-name { border: 0; padding: 0; min-height: 0; font-weight: 600; font-size: 16px; background: transparent; box-shadow: none; }
 .result-name:focus { box-shadow: none; outline: none; border-bottom: 1px solid var(--accent); border-radius: 0; }
 .big-kcal { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }

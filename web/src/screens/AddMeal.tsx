@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
 import { localDay, momentOf } from "../dates";
 import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
@@ -47,11 +47,27 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [estimated, setEstimated] = useState<Estimated | null>(null);
   const [announce, setAnnounce] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [replaceOk, setReplaceOk] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const questionsRef = useRef<HTMLDivElement>(null);
+
+  // Keep keyboard focus on the next thing the user needs, so it never falls back to the page top.
+  useEffect(() => {
+    if (questions) questionsRef.current?.querySelector("button")?.focus();
+  }, [questions]);
+  useEffect(() => {
+    if (estimated) nameRef.current?.focus();
+  }, [estimated]);
 
   function applyEstimate(result: Awaited<ReturnType<typeof api.estimate>>) {
     if (result.status === "needs_answers") {
+      // Earlier results no longer apply, so clear them rather than leave them on screen.
       setQuestions(result.questions);
       setAnswers({});
+      setProvider(null);
+      setEstimated(null);
+      setItems([]);
+      setAssumptions([]);
       return;
     }
     const e = result.estimate;
@@ -75,6 +91,12 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     setEstimateError(null);
     setNeedsKey(false);
     if (!withAnswers && describing.trim().length < 3) return setEstimateError("Describe what you ate first.");
+    // A new estimate replaces what the user typed, so ask once before doing it.
+    if (!withAnswers && !replaceOk && hasUserWork()) {
+      setReplaceOk(true);
+      return setEstimateError("This replaces the numbers and name you changed. Press Estimate again to continue.");
+    }
+    setReplaceOk(false);
     setEstimating(true);
     try {
       applyEstimate(await api.estimate(describing.trim(), withAnswers));
@@ -88,8 +110,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   }
 
   function answerAll() {
+    // Questions stay on screen until a reply arrives, so a failed request does not lose the answers.
     const supplied: SuppliedAnswer[] = (questions ?? []).map((q) => ({ ...q, answer: answers[q.id] ?? "unsure" }));
-    setQuestions(null);
     void estimate(supplied);
   }
 
@@ -99,7 +121,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
       const raw = values[field as keyof Values];
       const number = Number(raw);
       if (raw === "" || Number.isNaN(number) || number < min || number > max) {
-        return `${field.replace("_g", "")} must be between ${min} and ${max}.`;
+        return `${FIELD_LABEL[field as keyof Values]} must be between ${min} and ${max}.`;
       }
     }
     return null;
@@ -112,6 +134,12 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
       name.trim() !== estimated.name ||
       (Object.keys(LIMITS) as (keyof Values)[]).some((field) => values[field] !== estimated.values[field]);
     return changed ? "ai_edited" : "ai_confirmed";
+  }
+
+  // True when the user has typed or changed something that a new estimate would replace.
+  function hasUserWork(): boolean {
+    if (provider !== null) return sourceFor() === "ai_edited";
+    return name.trim() !== "" || Object.values(values).some((v) => v !== "");
   }
 
   async function submit(event: FormEvent) {
@@ -181,7 +209,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         {estimateError && <p className="error" role="alert">{estimateError}</p>}
 
         {questions && (
-          <div className="questions" role="group" aria-label="One quick question">
+          <div className="questions" role="group" aria-label="Quick questions" ref={questionsRef}>
             {questions.map((q) => (
               <fieldset key={q.id} className="question">
                 <legend>{q.question}</legend>
@@ -212,8 +240,10 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         {hasEstimate && (
           <div className="result">
             <div className="result-head">
+              <label htmlFor="result-name" className="result-label">Meal name</label>
               <input
-                aria-label="Meal name"
+                id="result-name"
+                ref={nameRef}
                 className="result-name"
                 value={name}
                 maxLength={120}
