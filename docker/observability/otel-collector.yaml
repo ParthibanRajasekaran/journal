@@ -14,6 +14,14 @@ receivers:
     include: [/var/lib/docker/containers/*/*-json.log]
     start_at: beginning
     storage: file_storage
+    # Docker wraps each line in its own JSON. Unwrap it so the application's JSON is the body.
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: attributes
+      - type: move
+        from: attributes.log
+        to: body
 
 processors:
   memory_limiter:
