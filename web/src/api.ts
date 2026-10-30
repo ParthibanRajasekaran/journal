@@ -105,6 +105,8 @@ export const api = {
 
   createMeal: (meal: NewMeal) =>
     request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),
+  updateMeal: (meal: Pick<Meal, "id" | "version">, patch: Partial<Omit<NewMeal, "client_id" | "source">>) =>
+    request<Meal>("PATCH", `/meals/${meal.id}`, patch, { "If-Match": String(meal.version) }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),
 
   estimate: (text: string) =>

@@ -1,5 +1,6 @@
 import { CSSProperties, useCallback, useEffect, useState } from "react";
 import { api, DaySummary, Meal } from "../api";
+import { EditMeal } from "./EditMeal";
 import { addDays, formatDay, timeOf, utcDay } from "../dates";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack"];
@@ -13,6 +14,7 @@ interface Props {
 export function Today({ day, onDayChange, onAdd }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -62,11 +64,30 @@ export function Today({ day, onDayChange, onAdd }: Props) {
                     <ul className="meal-group">
                       {meals.map((meal) => (
                         <li key={meal.id} className="meal-item">
-                          <span>
-                            <strong>{meal.name}</strong>
-                            <span className="muted"> · {timeOf(meal.eaten_at)} · <span className="num">{Math.round(meal.calories)}</span> kcal</span>
-                          </span>
-                          <button className="ghost" onClick={() => remove(meal)} aria-label={`Delete ${meal.name}`}>Delete</button>
+                          {editing === meal.id ? (
+                            <EditMeal
+                              meal={meal}
+                              onCancel={() => setEditing(null)}
+                              onSaved={() => {
+                                setEditing(null);
+                                load();
+                              }}
+                            />
+                          ) : (
+                            <>
+                              <span>
+                                <strong>{meal.name}</strong>
+                                <span className="muted"> · {timeOf(meal.eaten_at)} · <span className="num">{Math.round(meal.calories)}</span> kcal</span>
+                                <span className="muted num" style={{ display: "block", fontSize: 13 }}>
+                                  P {Math.round(meal.protein_g)} g · C {Math.round(meal.carbs_g)} g · F {Math.round(meal.fat_g)} g
+                                </span>
+                              </span>
+                              <span style={{ display: "flex", gap: 4 }}>
+                                <button className="ghost" onClick={() => setEditing(meal.id)} aria-label={`Edit ${meal.name}`}>Edit</button>
+                                <button className="ghost" onClick={() => remove(meal)} aria-label={`Delete ${meal.name}`}>Delete</button>
+                              </span>
+                            </>
+                          )}
                         </li>
                       ))}
                     </ul>

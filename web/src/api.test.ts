@@ -62,4 +62,12 @@ describe("api client", () => {
     expect(String(url)).not.toContain("sk-");
     expect(JSON.parse(init.body).api_key).toBe("sk-" + "a".repeat(30));
   });
+
+  it("sends the version we read, so an out-of-date edit is refused", async () => {
+    const spy = mockFetch(() => new Response(JSON.stringify({ id: "meal_1", version: 3 }), { status: 200 }));
+    await api.updateMeal({ id: "meal_1", version: 2 }, { name: "Soup" });
+    const [, init] = spy.mock.calls[0];
+    expect(init.method).toBe("PATCH");
+    expect(init.headers["If-Match"]).toBe("2");
+  });
 });
