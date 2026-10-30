@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
 import { localDay, momentOf } from "../dates";
-import { defaultMealFor, MealTimePicker, usualTime } from "./TimePicker";
+import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
 
 interface Props {
@@ -12,7 +12,6 @@ interface Props {
 
 const LIMITS = { calories: [0, 5000], protein_g: [0, 300], carbs_g: [0, 500], fat_g: [0, 300] } as const;
 const PROVIDER_NAME = { openai: "OpenAI", anthropic: "Claude", gemini: "Gemini" } as const;
-const MEAL_LABEL: Record<Meal["meal_type"], string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack" };
 
 type Values = { calories: string; protein_g: string; carbs_g: string; fat_g: string };
 
@@ -27,9 +26,9 @@ const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g:
 // One path: describe, check the estimate, save. Numbers are typed only when asked for.
 export function AddMeal({ day, onDone, onCancel }: Props) {
   const [name, setName] = useState("");
-  const [mealType, setMealType] = useState<Meal["meal_type"]>(() => defaultMealFor());
-  const [time, setTime] = useState(() => usualTime(defaultMealFor()));
-  const [pickingMeal, setPickingMeal] = useState(false);
+  const [start] = useState(nowRounded);
+  const [mealType, setMealType] = useState<Meal["meal_type"]>(() => mealFor(start));
+  const [time, setTime] = useState(start);
   const [values, setValues] = useState<Values>({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
   const [manual, setManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +142,6 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   }
 
   const hasEstimate = provider !== null;
-  const summary = `${MEAL_LABEL[mealType]} · ${time}`;
   const unsaved = describing.trim().length > 0 || hasEstimate || name.trim().length > 0;
 
   function cancel() {
@@ -255,21 +253,14 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
       {needsKey && <KeyHelp onSaved={() => void estimate()} />}
 
       <div className="meal-line">
-        {pickingMeal ? (
-          <MealTimePicker
-            mealType={mealType}
-            time={time}
-            onChange={(choice) => {
-              setMealType(choice.mealType);
-              setTime(choice.time);
-            }}
-          />
-        ) : (
-          <button type="button" className="ghost meal-summary" onClick={() => setPickingMeal(true)}>
-            {summary} <span aria-hidden="true">▾</span>
-            <span className="visually-hidden">Change meal and time</span>
-          </button>
-        )}
+        <MealTimePicker
+          mealType={mealType}
+          time={time}
+          onChange={(choice) => {
+            setMealType(choice.mealType);
+            setTime(choice.time);
+          }}
+        />
       </div>
 
       {manual && !hasEstimate && (
