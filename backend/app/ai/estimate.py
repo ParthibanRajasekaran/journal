@@ -1,70 +1,172 @@
 """Meal estimates from a text description, using the user's own provider key.
 
-The model is asked for one JSON object. Its reply is parsed and checked before anything is
-returned: each value must be in range (rejected, never clamped), the macros must roughly
-add up to the calories, and low-confidence or non-food answers are refused.
+The model returns one JSON object: the meal split into items, each with its own numbers, plus
+any questions whose answer changes the numbers (for example wheat or refined flour). A reply
+is checked before use. Values are refused when out of range, never clamped. Totals are the sum
+of the items, and must roughly match the macros' energy. A second request carries the user's
+answers. "Unsure" or a missing answer means the question's default is used, and we say so.
 """
 
 import json
-from typing import Any
+from dataclasses import dataclass, field
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from app.ai.providers import Provider, ProviderUnavailable
 
 INSTRUCTIONS = (
-    "You estimate the nutrition of a meal from a short description. Reply with only a JSON object "
-    'with keys: "is_food" (boolean), "name" (short name), "calories" (kcal), "protein_g", '
-    '"carbs_g", "fat_g" (grams), "confidence" (0 to 1). Values are for the whole amount described. '
-    "If the description is not food, set is_food to false and the numbers to 0."
+    "You estimate the nutrition of a meal from a short description. "
+    "Use standard reference values (for example USDA FoodData Central, and the Indian Food "
+    "Composition Tables for Indian dishes). "
+    "Split the meal into items, each with its own numbers for the amount described. "
+    "If a detail changes the numbers a lot and is not given (for example wheat or refined flour "
+    "in a bread, or oil in a fried dish), add a question with two to four options and name the "
+    "most typical option as default. Ask at most two questions. "
+    "Reply with only a JSON object with keys: "
+    '"is_food" (boolean), "name" (short name), "items" (list of objects with "name", "calories", '
+    '"protein_g", "carbs_g", "fat_g"), "questions" (list of objects with "id", "question", '
+    '"options", "default"), "confidence" (0 to 1). If the description is not food, set is_food '
+    "to false."
 )
 
 ENERGY_TOLERANCE_KCAL = 80
 ENERGY_TOLERANCE_RATIO = 0.35
 MIN_CONFIDENCE = 0.4
+MAX_QUESTIONS = 2
 
 
 class EstimateInvalid(Exception):
     """The reply could not be used. The message is safe to show the user."""
 
 
-class Estimate(BaseModel):
+class Item(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    calories: float = Field(ge=0, le=3000)
+    protein_g: float = Field(ge=0, le=200)
+    carbs_g: float = Field(ge=0, le=300)
+    fat_g: float = Field(ge=0, le=200)
+
+
+class Question(BaseModel):
+    id: str = Field(min_length=1, max_length=32, pattern=r"^[a-z_]+$")
+    question: str = Field(min_length=3, max_length=160)
+    options: list[str] = Field(min_length=2, max_length=4)
+    default: str
+
+
+class Reply(BaseModel):
     is_food: bool
     name: str = Field(min_length=1, max_length=120)
-    calories: float = Field(ge=0, le=5000)
-    protein_g: float = Field(ge=0, le=300)
-    carbs_g: float = Field(ge=0, le=500)
-    fat_g: float = Field(ge=0, le=300)
+    items: list[Item] = Field(min_length=1, max_length=12)
+    questions: list[Question] = Field(default_factory=list, max_length=MAX_QUESTIONS)
     confidence: float = Field(ge=0, le=1)
 
 
-def parse_reply(text: str) -> Estimate:
+@dataclass
+class Estimate:
+    name: str
+    items: list[Item]
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    confidence: float
+    assumptions: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Pending:
+    questions: list[Question]
+
+
+class SuppliedAnswer(BaseModel):
+    """A question the user was asked, with their reply. The client sends these back unchanged."""
+
+    id: str = Field(min_length=1, max_length=32, pattern=r"^[a-z_]+$")
+    question: str = Field(min_length=3, max_length=160)
+    options: list[str] = Field(min_length=2, max_length=4)
+    default: str = Field(min_length=1, max_length=60)
+    answer: str = Field(min_length=1, max_length=60)
+
+
+UNSURE = "unsure"
+
+
+def _is_unsure(supplied: SuppliedAnswer) -> bool:
+    return supplied.answer == UNSURE or supplied.answer not in supplied.options
+
+
+def parse_reply(text: str, supplied: list[SuppliedAnswer] | None = None) -> Estimate | Pending:
+    """Return the estimate, or the questions to ask.
+
+    With answers supplied, the model is not asked again: anything unanswered or "unsure" takes
+    the default, and that is listed as an assumption.
+    """
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise EstimateInvalid("The estimate could not be read. Try describing the meal again.")
     try:
-        raw: Any = json.loads(text[start : end + 1])
-        estimate = Estimate.model_validate(raw)
-    except (json.JSONDecodeError, ValueError) as exc:
+        reply = Reply.model_validate(json.loads(text[start : end + 1]))
+    except (json.JSONDecodeError, ValidationError) as exc:
         raise EstimateInvalid(
             "The estimate was incomplete. Try describing the meal again."
         ) from exc
 
-    if not estimate.is_food:
+    if not reply.is_food:
         raise EstimateInvalid("That does not look like food. Describe what you ate.")
-    if estimate.confidence < MIN_CONFIDENCE:
+    if reply.confidence < MIN_CONFIDENCE:
         raise EstimateInvalid(
             "Not confident enough to estimate this. Add more detail, or enter the values yourself."
         )
-    # Protein and carbs give 4 kcal per gram, fat gives 9. Allow for rounding and cooking losses.
-    from_macros = 4 * estimate.protein_g + 4 * estimate.carbs_g + 9 * estimate.fat_g
-    allowed = max(ENERGY_TOLERANCE_KCAL, ENERGY_TOLERANCE_RATIO * estimate.calories)
-    if abs(from_macros - estimate.calories) > allowed:
+
+    if supplied is None and reply.questions:
+        return Pending(questions=reply.questions)
+
+    assumptions = [
+        f"{a.question.rstrip('?')}: assumed {a.default}" for a in (supplied or []) if _is_unsure(a)
+    ]
+
+    totals = {
+        f: round(sum(getattr(i, f) for i in reply.items), 1)
+        for f in ("calories", "protein_g", "carbs_g", "fat_g")
+    }
+    if not (
+        0 <= totals["calories"] <= 5000
+        and 0 <= totals["protein_g"] <= 300
+        and 0 <= totals["carbs_g"] <= 500
+        and 0 <= totals["fat_g"] <= 300
+    ):
+        raise EstimateInvalid(
+            "The total was out of range. Try again, or enter the values yourself."
+        )
+    from_macros = 4 * totals["protein_g"] + 4 * totals["carbs_g"] + 9 * totals["fat_g"]
+    allowed = max(ENERGY_TOLERANCE_KCAL, ENERGY_TOLERANCE_RATIO * totals["calories"])
+    if abs(from_macros - totals["calories"]) > allowed:
         raise EstimateInvalid(
             "The numbers did not add up. Try again, or enter the values yourself."
         )
-    return estimate
+
+    return Estimate(
+        name=reply.name,
+        items=reply.items,
+        calories=totals["calories"],
+        protein_g=totals["protein_g"],
+        carbs_g=totals["carbs_g"],
+        fat_g=totals["fat_g"],
+        confidence=reply.confidence,
+        assumptions=assumptions,
+    )
+
+
+def describe_answers(supplied: list[SuppliedAnswer]) -> str:
+    lines = []
+    for a in supplied:
+        if _is_unsure(a):
+            lines.append(f"- {a.question} The user did not know; use the default: {a.default}.")
+        else:
+            lines.append(f"- {a.question} The user answered: {a.answer}.")
+    return "\n".join(lines)
 
 
 async def ask_provider(
@@ -93,7 +195,7 @@ async def ask_provider(
                 headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"},
                 json={
                     "model": model,
-                    "max_tokens": 300,
+                    "max_tokens": 800,
                     "system": INSTRUCTIONS,
                     "messages": [{"role": "user", "content": description}],
                 },

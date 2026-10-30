@@ -879,33 +879,54 @@ components:
           type: string
           minLength: 3
           maxLength: 1000
-          description: What was eaten, in the user's words
-        provider:
+        provider: &id006
           type: string
           enum:
           - openai
           - anthropic
           - gemini
-          description: Optional. Defaults to the first saved key.
+        answers:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/SuppliedAnswer'
+          description: Send the same text back with the user's answers. At most two rounds.
       additionalProperties: false
     EstimateResponse:
-      type: object
-      required:
-      - provider
-      - estimate
-      properties:
-        provider:
-          type: string
-          enum:
-          - openai
-          - anthropic
-          - gemini
-        estimate:
-          $ref: '#/components/schemas/NutritionEstimate'
-      additionalProperties: false
+      oneOf:
+      - type: object
+        required:
+        - status
+        - provider
+        - questions
+        properties:
+          status:
+            type: string
+            enum:
+            - needs_answers
+          provider: *id006
+          questions:
+            type: array
+            items:
+              $ref: '#/components/schemas/EstimateQuestion'
+        additionalProperties: false
+      - type: object
+        required:
+        - status
+        - provider
+        - estimate
+        properties:
+          status:
+            type: string
+            enum:
+            - estimate
+          provider: *id006
+          estimate:
+            $ref: '#/components/schemas/NutritionEstimate'
+        additionalProperties: false
     NutritionEstimate:
       type: object
-      description: 'Checked before it is returned: in range (refused, never clamped), macros roughly match calories, confident enough. Nothing is saved.'
+      description: 'Totals are the sum of the items. Checked before it is returned: in range (refused, never clamped), macros roughly match calories, confident enough. Nothing is saved.'
       required:
       - name
       - calories
@@ -913,6 +934,8 @@ components:
       - carbs_g
       - fat_g
       - confidence
+      - items
+      - assumptions
       properties:
         name:
           type: string
@@ -937,6 +960,33 @@ components:
           type: number
           minimum: 0
           maximum: 1
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - name
+            - calories
+            - protein_g
+            - carbs_g
+            - fat_g
+            properties:
+              name:
+                type: string
+              calories:
+                type: number
+              protein_g:
+                type: number
+              carbs_g:
+                type: number
+              fat_g:
+                type: number
+            additionalProperties: false
+        assumptions:
+          type: array
+          items:
+            type: string
+          description: Defaults used because the user did not know
       additionalProperties: false
     MealCreate:
       type: object
@@ -1224,4 +1274,56 @@ components:
         acknowledge_provider_terms:
           type: boolean
           const: true
+      additionalProperties: false
+    SuppliedAnswer:
+      type: object
+      required:
+      - id
+      - question
+      - options
+      - default
+      - answer
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z_]+$
+          maxLength: 32
+        question:
+          type: string
+          minLength: 3
+          maxLength: 160
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items:
+            type: string
+            maxLength: 60
+        default:
+          type: string
+          maxLength: 60
+        answer:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: One of the options, or 'unsure' to use the default
+      additionalProperties: false
+    EstimateQuestion:
+      type: object
+      required:
+      - id
+      - question
+      - options
+      - default
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        default:
+          type: string
       additionalProperties: false
