@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { api, Totals } from "../api";
 import { addDays, formatDay, localDay, mondayOf, userTz } from "../dates";
+import { APPROXIMATE, weekLines } from "../encouragement";
 
 interface Props {
   onOpenDay: (day: string) => void;
+  proteinTarget: number | null;
 }
 
-export function Week({ onOpenDay }: Props) {
+export function Week({ onOpenDay, proteinTarget }: Props) {
   const [start, setStart] = useState(() => mondayOf(localDay()));
   const [days, setDays] = useState<Totals[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,14 @@ export function Week({ onOpenDay }: Props) {
         <section className="card load-error" role="alert">
           <p>Couldn't load this week. {error}</p>
           <button className="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </section>
+      )}
+      {days && (
+        <section className="card encourage" aria-label="Your week">
+          {weekLines(days, proteinTarget).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+          <p className="fine-print muted">{APPROXIMATE}</p>
         </section>
       )}
       {days && (

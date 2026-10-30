@@ -2,6 +2,7 @@ import { CSSProperties, useCallback, useEffect, useState } from "react";
 import { api, DaySummary, Meal } from "../api";
 import { EditMeal } from "./EditMeal";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
+import { savedLine } from "../encouragement";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -9,13 +10,23 @@ interface Props {
   day: string;
   onDayChange: (day: string) => void;
   onAdd: () => void;
+  // True when the user has just saved a meal and came back here.
+  savedNote: boolean;
 }
 
-export function Today({ day, onDayChange, onAdd }: Props) {
+export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [showSaved, setShowSaved] = useState(savedNote);
+
+  // The confirmation fades on its own, and a tap dismisses it.
+  useEffect(() => {
+    if (!showSaved || !summary) return;
+    const timer = setTimeout(() => setShowSaved(false), 3500);
+    return () => clearTimeout(timer);
+  }, [showSaved, summary]);
 
   const load = useCallback(() => {
     setError(null);
@@ -48,6 +59,13 @@ export function Today({ day, onDayChange, onAdd }: Props) {
       </div>
 
       {error && summary && <p className="error" role="alert">{error}</p>}
+
+      {showSaved && summary && (
+        <p className="saved-note" role="status" onClick={() => setShowSaved(false)}>
+          <span className="check" aria-hidden="true">✓</span>
+          {savedLine(summary.protein_g, summary.targets.protein_g)}
+        </p>
+      )}
 
       {summary ? (
         <div className="today-grid">

@@ -16,6 +16,7 @@ export function App() {
   const [profile, setProfile] = useState<Loaded>("loading");
   const [attempt, setAttempt] = useState(0);
   const [screen, setScreen] = useState<Screen>({ name: "today", day: localDay() });
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     setProfile("loading");
@@ -64,6 +65,7 @@ export function App() {
   const tab: Tab = screen.name === "add" ? "today" : screen.name;
   const go = (next: Screen) => (event: React.MouseEvent) => {
     event.preventDefault();
+    setJustSaved(false);
     setScreen(next);
   };
   const todayNow = (): Screen => ({ name: "today", day: localDay() });
@@ -94,12 +96,29 @@ export function App() {
       <main className="shell">
         <div key={screen.name === "today" ? `today-${screen.day}` : screen.name} className="screen">
           {screen.name === "today" && (
-            <Today day={screen.day} onDayChange={(day) => setScreen({ name: "today", day })} onAdd={() => setScreen({ name: "add", day: screen.day })} />
+            <Today
+              day={screen.day}
+              onDayChange={(day) => {
+                setJustSaved(false);
+                setScreen({ name: "today", day });
+              }}
+              onAdd={() => setScreen({ name: "add", day: screen.day })}
+              savedNote={justSaved}
+            />
           )}
           {screen.name === "add" && (
-            <AddMeal day={screen.day} onDone={() => setScreen({ name: "today", day: screen.day })} onCancel={() => setScreen({ name: "today", day: screen.day })} />
+            <AddMeal
+              day={screen.day}
+              onDone={() => {
+                setJustSaved(true);
+                setScreen({ name: "today", day: screen.day });
+              }}
+              onCancel={() => setScreen({ name: "today", day: screen.day })}
+            />
           )}
-          {screen.name === "week" && <Week onOpenDay={(day) => setScreen({ name: "today", day })} />}
+          {screen.name === "week" && (
+            <Week onOpenDay={(day) => setScreen({ name: "today", day })} proteinTarget={profile.daily_targets.protein_g} />
+          )}
           {screen.name === "settings" && <Settings profile={profile} onProfile={setProfile} onSignedOut={() => setProfile(null)} />}
         </div>
       </main>

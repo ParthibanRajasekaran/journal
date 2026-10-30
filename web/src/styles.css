@@ -242,6 +242,20 @@ nav.tabs a.tab-add { color: var(--accent-ink); background: var(--accent); font-w
   .ripple { display: none; }
 }
 
+/* Encouragement: a calm confirmation after saving, and the week summary */
+.saved-note {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 12px 14px;
+  border-radius: 12px; background: var(--accent-soft); border: 1px solid rgba(15, 118, 110, 0.22);
+  color: var(--text); cursor: pointer; animation: enter 320ms var(--ease) both;
+}
+.saved-note .check {
+  display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; animation: pop-check 420ms var(--spring) both;
+}
+@keyframes pop-check { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.encourage p { margin: 0 0 6px; font-size: 16px; }
+.encourage .fine-print { margin-top: 10px; text-align: left; }
+
 /* Info panel for the ⓘ tips */
 .info-panel {
   position: absolute; top: 40px; left: 0; z-index: 5; width: min(360px, 80vw);
