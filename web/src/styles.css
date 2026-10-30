@@ -265,3 +265,10 @@ nav.tabs a.active { color: var(--accent); background: var(--accent-soft); }
 @media (min-width: 1440px) {
   .today-grid { grid-template-columns: 460px 1fr; }
 }
+
+/* Describe-and-estimate box on Add meal */
+.estimate-box { background: var(--accent-soft); border: 1px solid rgba(15, 118, 110, 0.22); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+.estimate-box label { margin-top: 0; color: var(--text); font-weight: 600; }
+.estimate-row { display: flex; gap: 10px; align-items: stretch; }
+.estimate-row textarea { flex: 1; font: inherit; color: var(--text); background: var(--surface); border: 1px solid #6b7280; border-radius: 12px; padding: 10px 14px; resize: vertical; min-height: 48px; }
+.estimate-row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.16); }

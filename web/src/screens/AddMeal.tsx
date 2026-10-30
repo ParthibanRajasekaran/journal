@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { api, Meal } from "../api";
+import { api, ApiError, Meal } from "../api";
 import { utcDay } from "../dates";
 
 interface Props {
@@ -18,6 +18,35 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [values, setValues] = useState({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [describing, setDescribing] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const [estimateNote, setEstimateNote] = useState<string | null>(null);
+
+  async function estimate() {
+    setError(null);
+    setEstimateNote(null);
+    if (describing.trim().length < 3) return setError("Describe what you ate first.");
+    setEstimating(true);
+    try {
+      const result = await api.estimate(describing.trim());
+      const e = result.estimate;
+      setName((current) => (current.trim() ? current : e.name));
+      setValues({
+        calories: String(Math.round(e.calories)),
+        protein_g: String(Math.round(e.protein_g)),
+        carbs_g: String(Math.round(e.carbs_g)),
+        fat_g: String(Math.round(e.fat_g)),
+      });
+      setEstimateNote(
+        `Estimated with your ${result.provider === "openai" ? "OpenAI" : result.provider === "anthropic" ? "Claude" : "Gemini"} key. Check the numbers, then save.`,
+      );
+    } catch (err) {
+      const e = err as ApiError;
+      setError(e.status === 409 ? "Add your AI key in Settings to estimate meals." : e.message);
+    } finally {
+      setEstimating(false);
+    }
+  }
 
   function problem(): string | null {
     if (name.trim().length === 0) return "Give the meal a name.";
@@ -60,6 +89,23 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   return (
     <form onSubmit={submit} noValidate className="card add-form">
       <h1>Add meal{day !== utcDay() ? ` for ${day}` : ""}</h1>
+
+      <div className="estimate-box">
+        <label htmlFor="describe">Describe it, and we'll work out the numbers</label>
+        <div className="estimate-row">
+          <textarea
+            id="describe"
+            rows={2}
+            value={describing}
+            onChange={(e) => setDescribing(e.target.value)}
+            placeholder="e.g. 4 poori with 5 spoons of paneer butter masala"
+          />
+          <button type="button" className="primary" onClick={estimate} disabled={estimating}>
+            {estimating ? "Working…" : "Estimate"}
+          </button>
+        </div>
+        {estimateNote && <p className="muted" role="status">{estimateNote}</p>}
+      </div>
 
       <div className="form-grid">
       <div className="span-2">

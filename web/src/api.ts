@@ -107,6 +107,12 @@ export const api = {
     request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),
 
+  estimate: (text: string) =>
+    request<{
+      provider: Provider;
+      estimate: { name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; confidence: number };
+    }>("POST", "/estimates", { text }),
+
   aiKeys: () => request<AiKeyStatus[]>("GET", "/me/ai-keys"),
   saveAiKey: (provider: Provider, apiKey: string) =>
     request<AiKeyStatus>("PUT", `/me/ai-keys/${provider}`, {
