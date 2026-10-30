@@ -55,6 +55,25 @@ describe("api client", () => {
     await expect(api.deleteMeal("meal_1")).rejects.toBeInstanceOf(ApiError);
   });
 
+  it("refreshes the session once after a 401, then retries the request", async () => {
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "usr_1" }), { status: 200 }));
+    vi.stubGlobal("fetch", spy);
+    await expect(api.me()).resolves.toMatchObject({ id: "usr_1" });
+    const urls = spy.mock.calls.map((call) => String(call[0]));
+    expect(urls).toEqual(["/api/v1/me", "/api/v1/auth/refresh", "/api/v1/me"]);
+  });
+
+  it("does not try to refresh when the refresh itself is refused", async () => {
+    const spy = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", spy);
+    await expect(api.me()).rejects.toMatchObject({ status: 401 });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it("never puts an AI key in the URL", async () => {
     const spy = mockFetch(() => new Response(JSON.stringify({ provider: "openai" }), { status: 200 }));
     await api.saveAiKey("openai", "sk-" + "a".repeat(30), true);

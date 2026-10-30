@@ -105,16 +105,36 @@ export type EstimateReply =
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
 const BASE = "/api/v1";
 
-async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+async function send(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<Response> {
   const headers: Record<string, string> = { ...extra };
   if (method !== "GET") Object.assign(headers, CSRF_HEADER);
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetch(BASE + path, {
+  return fetch(BASE + path, {
     method,
     credentials: "include",
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+// The access cookie lasts 15 minutes. One refresh is shared by every request that needs it: the
+// server rotates refresh tokens, so two refreshes at once would look like reuse and end the session.
+let refreshing: Promise<boolean> | null = null;
+function refreshSession(): Promise<boolean> {
+  refreshing ??= send("POST", "/auth/refresh")
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+  let response = await send(method, path, body, extra);
+  if (response.status === 401 && !path.startsWith("/auth/") && (await refreshSession())) {
+    response = await send(method, path, body, extra);
+  }
   if (response.status === 204) return undefined as T;
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
