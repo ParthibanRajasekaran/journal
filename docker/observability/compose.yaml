@@ -65,13 +65,40 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
     volumes:
       - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/journal.yaml:ro
+      - ./observability/dashboards.yaml:/etc/grafana/provisioning/dashboards/journal.yaml:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
       - "127.0.0.1:3000:3000"
     mem_limit: 256m
     networks: [internal]
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    mem_limit: 128m
+    networks: [internal]
+
+  alert-bridge:
+    image: python:3.12-slim
+    restart: unless-stopped
+    # Forwards alerts to the private ntfy topic the disk alert already uses. Only fixed alert text is sent.
+    command: ["python", "/app/alert_bridge.py"]
+    environment:
+      NTFY_TOPIC: ${NTFY_TOPIC:?set NTFY_TOPIC in docker/.env}
+    volumes:
+      - ./observability/alert_bridge.py:/app/alert_bridge.py:ro
+    mem_limit: 96m
+    networks: [internal]
+
 volumes:
+  alertmanager_data:
   collector_state:
   prometheus_data:
   loki_data:

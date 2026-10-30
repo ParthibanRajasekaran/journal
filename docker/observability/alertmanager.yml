@@ -1,0 +1,13 @@
+# Routes every firing Journal alert to the private ntfy bridge.
+route:
+  receiver: ntfy-bridge
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 10m
+  repeat_interval: 4h
+
+receivers:
+  - name: ntfy-bridge
+    webhook_configs:
+      - url: http://alert-bridge:8080/alert
+        send_resolved: false

@@ -1,0 +1,63 @@
+{
+  "uid": "journal-overview",
+  "title": "Journal overview",
+  "tags": ["journal"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Estimate results by provider and outcome (per hour)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (provider, outcome) (increase(journal_estimate_outcome_total[1h]))", "legendFormat": "{{provider}} {{outcome}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Estimates in the last 24 hours",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(journal_estimate_outcome_total[24h]))" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Share of estimates that failed (last hour)",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(journal_estimate_outcome_total{outcome=\"error\"}[1h])) / clamp_min(sum(increase(journal_estimate_outcome_total[1h])), 1)" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "API log lines per minute",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "expr": "sum(count_over_time({service_name=\"journal-api\"}[1m]))" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Recent API log lines",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        { "refId": "A", "expr": "{service_name=\"journal-api\"}" }
+      ]
+    }
+  ]
+}
