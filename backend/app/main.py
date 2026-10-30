@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, FastAPI
 from jwt import PyJWKClient
 
+from app import telemetry
 from app.ai.providers import ProviderKeyChecker
 from app.auth.google import JWKS_URL
 from app.config import Settings, get_settings
@@ -17,6 +18,7 @@ API_PREFIX = "/api/v1"
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    telemetry.configure_logging()
     production = settings.environment == "production"
     app = FastAPI(
         title="Journal API",
@@ -34,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.key_checker = ProviderKeyChecker(httpx.AsyncClient())
     app.state.estimate_http = httpx.AsyncClient()
     install_problem_handlers(app)
+    telemetry.instrument(app, settings.otel_endpoint)
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health.router)

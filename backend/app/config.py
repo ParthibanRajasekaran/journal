@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="JOURNAL_", extra="forbid", env_file=".env")
 
     environment: Literal["development", "test", "production"] = "development"
+    # OTLP/HTTP endpoint of the OpenTelemetry Collector on the internal network.
+    # Unset means nothing is exported.
+    otel_endpoint: str | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     problem_type_base: str = "https://journal.example/problems/"
     # Local development default. Production must set JOURNAL_DATABASE_URL explicitly.

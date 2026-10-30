@@ -25,6 +25,7 @@ from app.auth.deps import CurrentUserId, SessionDep, require_write
 from app.config import Settings
 from app.crypto import CryptoError, decrypt, load_key
 from app.db.models import AiKey
+from app.telemetry import estimate_outcome
 
 router = APIRouter(tags=["Estimates"])
 
@@ -78,6 +79,7 @@ async def create_estimate(
     order: list[Provider] = [body.provider] if body.provider else list(PROVIDERS)
     provider = next((p for p in order if p in saved), None)
     if provider is None:
+        estimate_outcome("refused", "none")
         raise HTTPException(
             status_code=409, detail="Add your AI key in Settings to estimate meals."
         )
@@ -104,16 +106,20 @@ async def create_estimate(
         )
         result = parse_reply(reply, supplied=body.answers)
     except ProviderUnavailable as exc:
+        estimate_outcome("error", provider)
         raise HTTPException(
             status_code=503, detail="The provider could not be reached. Try again."
         ) from exc
     except EstimateInvalid as exc:
+        estimate_outcome("invalid", provider)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     if isinstance(result, Pending):
+        estimate_outcome("questions", provider)
         return {
             "status": "needs_answers",
             "provider": provider,
             "questions": [q.model_dump() for q in result.questions],
         }
+    estimate_outcome("ok", provider)
     return {"status": "estimate", "provider": provider, "estimate": _estimate_out(result)}
