@@ -79,19 +79,19 @@ function AiKeys() {
 
   return (
     <section className="card">
-      <h2 style={{ marginTop: 0 }}>Your AI keys</h2>
+      <h2 style={{ marginTop: 0 }}>Your AI key</h2>
       <p className="muted">
-        Use your own provider account. Your key is checked once, stored encrypted, and never shown again. Requests go to your provider under its terms.
+        Use your own provider account. Your key is checked once, stored encrypted, and never shown again.
       </p>
       {error && <p className="error" role="alert">{error}</p>}
-      <ul className="plain">
-        {keys.map((key) => (
-          <KeyRow key={key.provider} status={key} onChanged={load} />
-        ))}
-      </ul>
-      {PROVIDERS.filter((p) => !keys.some((k) => k.provider === p.id)).map((p) => (
-        <AddKey key={p.id} provider={p} onSaved={load} />
-      ))}
+      {keys.length > 0 && (
+        <ul className="plain">
+          {keys.map((key) => (
+            <KeyRow key={key.provider} status={key} onChanged={load} />
+          ))}
+        </ul>
+      )}
+      <AddKey onSaved={load} />
     </section>
   );
 }
@@ -112,20 +112,23 @@ function KeyRow({ status, onChanged }: { status: AiKeyStatus; onChanged: () => v
   );
 }
 
-function AddKey({ provider, onSaved }: { provider: (typeof PROVIDERS)[number]; onSaved: () => void }) {
+function AddKey({ onSaved }: { onSaved: () => void }) {
+  const [provider, setProvider] = useState<Provider>("openai");
   const [apiKey, setApiKey] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const selected = PROVIDERS.find((p) => p.id === provider)!;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!agreed) return setError("Please confirm before saving.");
+    if (!agreed) return setError("Please tick the box to confirm.");
     setError(null);
     setSaving(true);
     try {
-      await api.saveAiKey(provider.id, apiKey.trim());
+      await api.saveAiKey(provider, apiKey.trim());
       setApiKey("");
+      setAgreed(false);
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -136,21 +139,29 @@ function AddKey({ provider, onSaved }: { provider: (typeof PROVIDERS)[number]; o
 
   return (
     <form onSubmit={submit} style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 12 }}>
-      <label htmlFor={`key-${provider.id}`}>{provider.label}. {provider.help}</label>
+      <label htmlFor="ai-provider">Provider</label>
+      <select id="ai-provider" value={provider} onChange={(e) => setProvider(e.target.value as Provider)}>
+        {PROVIDERS.map((p) => (
+          <option key={p.id} value={p.id}>{p.label}</option>
+        ))}
+      </select>
+      <label htmlFor="ai-key">Your key. {selected.help}</label>
       <input
-        id={`key-${provider.id}`}
+        id="ai-key"
         type="password"
         autoComplete="off"
         spellCheck={false}
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
       />
-      <label className="row" style={{ justifyContent: "flex-start", fontSize: 14 }}>
+      <label className="row" style={{ justifyContent: "flex-start", fontSize: 14, cursor: "pointer" }}>
         <input type="checkbox" style={{ width: 20, minHeight: 20 }} checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-        I understand my requests go to this provider under its terms, on my account.
+        My requests go to this provider, under its terms, on my account.
       </label>
       {error && <p className="error" role="alert">{error}</p>}
-      <button type="submit" disabled={saving || apiKey.trim().length === 0}>{saving ? "Checking…" : "Save key"}</button>
+      <button type="submit" className="primary" style={{ marginTop: 12 }} disabled={saving || apiKey.trim().length === 0}>
+        {saving ? "Checking…" : "Save key"}
+      </button>
     </form>
   );
 }
