@@ -74,6 +74,20 @@ describe("api client", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("turns a dropped connection into a plain message, not a browser error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(api.me()).rejects.toMatchObject({ status: 0, message: expect.stringContaining("Can't reach Journal") });
+  });
+
+  it("announces a signed-out session when the renewal is refused", async () => {
+    const listener = vi.fn();
+    window.addEventListener("journal:signed-out", listener);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+    await expect(api.me()).rejects.toMatchObject({ status: 401 });
+    expect(listener).toHaveBeenCalled();
+    window.removeEventListener("journal:signed-out", listener);
+  });
+
   it("never puts an AI key in the URL", async () => {
     const spy = mockFetch(() => new Response(JSON.stringify({ provider: "openai" }), { status: 200 }));
     await api.saveAiKey("openai", "sk-" + "a".repeat(30), true);

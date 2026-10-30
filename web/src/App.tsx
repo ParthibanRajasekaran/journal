@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, Profile } from "./api";
+import { api, ApiError, Profile, SIGNED_OUT_EVENT } from "./api";
 import { SignIn } from "./screens/SignIn";
 import { Today } from "./screens/Today";
 import { AddMeal } from "./screens/AddMeal";
@@ -28,6 +28,13 @@ export function App() {
         setProfile(signedOut ? null : "error");
       });
   }, [attempt]);
+
+  // A renewal that fails anywhere in the app sends the user back to sign-in, instead of a dead end.
+  useEffect(() => {
+    const signedOut = () => setProfile(null);
+    window.addEventListener(SIGNED_OUT_EVENT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
+  }, []);
 
   // When the screen changes (for example after Save), move focus to its heading rather than the page top.
   const firstScreen = useRef(true);
