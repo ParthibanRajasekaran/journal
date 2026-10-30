@@ -6,9 +6,9 @@ PG_HOST ?= 127.0.0.1
 PG_PORT ?= 5433
 export JOURNAL_TEST_DATABASE_URL ?= postgresql+asyncpg://$(PG_HOST):$(PG_PORT)/journal_test
 
-.PHONY: check preflight lint typecheck test policy secrets audit hooks db-setup
+.PHONY: check preflight lint typecheck test policy secrets audit hooks db-setup web
 
-check: preflight lint typecheck test policy secrets audit
+check: preflight lint typecheck test policy secrets audit web
 
 # Fail fast with a clear message rather than letting the database tests error out.
 preflight:
@@ -44,3 +44,7 @@ audit:
 
 hooks:
 	pre-commit install
+
+# Web screens: type-check, unit tests, and a production build.
+web:
+	cd web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build

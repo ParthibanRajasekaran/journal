@@ -34,3 +34,7 @@ __pycache__/
 # macOS archive metadata (AppleDouble)
 ._*
 .DS_Store
+
+# Web app build output and packages
+web/node_modules/
+web/dist/
