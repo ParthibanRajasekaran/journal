@@ -3,11 +3,22 @@ import { api, ApiError, Provider } from "../api";
 
 // Where each provider creates a key. We cannot fetch the key for the user: the provider only shows
 // it in its own console, so the user copies it back here.
-// Claude's console address has changed over time, so this links to Anthropic's own getting-started page.
+// Links were checked against each provider's official documentation. OpenAI's docs do not link its
+// key page, so its button opens the official quickstart, which explains where to create the key.
 export const PROVIDERS: { id: Provider; label: string; url: string; prefix: string }[] = [
-  { id: "openai", label: "OpenAI", url: "https://platform.openai.com/api-keys", prefix: "sk-" },
-  { id: "anthropic", label: "Claude", url: "https://docs.anthropic.com/en/api/getting-started", prefix: "sk-ant-" },
-  { id: "gemini", label: "Gemini", url: "https://aistudio.google.com/app/apikey", prefix: "AIza" },
+  {
+    id: "openai",
+    label: "OpenAI",
+    url: "https://developers.openai.com/api/docs/quickstart",
+    prefix: "sk-",
+  },
+  {
+    id: "anthropic",
+    label: "Claude",
+    url: "https://platform.claude.com/settings/keys",
+    prefix: "sk-ant-",
+  },
+  { id: "gemini", label: "Gemini", url: "https://aistudio.google.com/apikey", prefix: "AIza" },
 ];
 
 interface Props {
