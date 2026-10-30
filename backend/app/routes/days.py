@@ -1,12 +1,14 @@
 """Day and week summaries: totals over meals the signed-in user owns.
 
-Days are UTC calendar days. A meal belongs to the day of its eaten_at time in UTC.
+A day is a calendar day in the user's own time zone, which the app sends as ?tz=. Without it,
+days are UTC. A meal belongs to the local day of its eaten_at time.
 """
 
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from sqlalchemy import select
@@ -44,9 +46,16 @@ def _check_range(day: date) -> None:
         raise HTTPException(status_code=422, detail="Date must be between 1900 and 2999.")
 
 
-def _bounds(first: date, last: date) -> tuple[datetime, datetime]:
-    lower = datetime.combine(first, time.min, tzinfo=UTC)
-    upper = datetime.combine(last + timedelta(days=1), time.min, tzinfo=UTC)
+def _zone(name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Unknown time zone.") from exc
+
+
+def _bounds(first: date, last: date, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    lower = datetime.combine(first, time.min, tzinfo=zone).astimezone(UTC)
+    upper = datetime.combine(last + timedelta(days=1), time.min, tzinfo=zone).astimezone(UTC)
     return lower, upper
 
 
@@ -55,9 +64,11 @@ async def get_day(
     day: Annotated[date, Path(alias="date")],
     user_id: CurrentUserId,
     session: SessionDep,
+    tz: Annotated[str, Query(max_length=60)] = "UTC",
 ) -> dict[str, Any]:
     _check_range(day)
-    lower, upper = _bounds(day, day)
+    zone = _zone(tz)
+    lower, upper = _bounds(day, day, zone)
     meals = (
         (
             await session.execute(
@@ -84,10 +95,12 @@ async def get_week(
     user_id: CurrentUserId,
     session: SessionDep,
     start: Annotated[date, Query()],
+    tz: Annotated[str, Query(max_length=60)] = "UTC",
 ) -> list[dict[str, Any]]:
     _check_range(start)
+    zone = _zone(tz)
     days = [start + timedelta(days=offset) for offset in range(7)]
-    lower, upper = _bounds(days[0], days[-1])
+    lower, upper = _bounds(days[0], days[-1], zone)
     meals = (
         (
             await session.execute(
@@ -101,5 +114,5 @@ async def get_week(
     )
     by_day: dict[date, list[Meal]] = defaultdict(list)
     for meal in meals:
-        by_day[meal.eaten_at.astimezone(UTC).date()].append(meal)
+        by_day[meal.eaten_at.astimezone(zone).date()].append(meal)
     return [_totals(day, by_day[day]) for day in days]

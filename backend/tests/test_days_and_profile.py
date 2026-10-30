@@ -165,3 +165,28 @@ def test_extreme_dates_are_refused_not_crashed(
 def test_extreme_week_start_is_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     _sign_in_as(client, monkeypatch, "owner-a")
     assert client.get("/api/v1/week", params={"start": "9999-12-31"}).status_code == 422
+
+
+def test_a_late_meal_lands_on_the_users_own_day(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    # 23:30 UTC on 29 October is already 30 October in Tokyo (+9).
+    _create(client, _meal_body(eaten_at="2026-10-29T23:30:00Z", calories=400))
+    assert client.get("/api/v1/days/2026-10-29").json()["meal_count"] == 1
+    assert (
+        client.get("/api/v1/days/2026-10-29", params={"tz": "Asia/Tokyo"}).json()["meal_count"] == 0
+    )
+    assert (
+        client.get("/api/v1/days/2026-10-30", params={"tz": "Asia/Tokyo"}).json()["meal_count"] == 1
+    )
+    week = client.get("/api/v1/week", params={"start": "2026-10-26", "tz": "Asia/Tokyo"}).json()
+    assert week[4]["date"] == "2026-10-30"
+    assert week[4]["meal_count"] == 1
+
+
+def test_an_unknown_time_zone_is_refused(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in_as(client, monkeypatch, "owner-a")
+    assert client.get("/api/v1/days/2026-10-29", params={"tz": "Mars/Olympus"}).status_code == 422

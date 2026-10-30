@@ -62,7 +62,7 @@ export interface NewMeal {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
-  source: "manual";
+  source: "manual" | "ai_confirmed" | "ai_edited";
 }
 
 export interface EstimateQuestion {
@@ -136,8 +136,8 @@ export const api = {
   deleteAccount: () => request<void>("DELETE", "/me"),
   logout: () => request<void>("POST", "/auth/logout"),
 
-  day: (date: string) => request<DaySummary>("GET", `/days/${date}`),
-  week: (start: string) => request<Totals[]>("GET", `/week?start=${start}`),
+  day: (date: string, tz: string) => request<DaySummary>("GET", `/days/${date}?tz=${encodeURIComponent(tz)}`),
+  week: (start: string, tz: string) => request<Totals[]>("GET", `/week?start=${start}&tz=${encodeURIComponent(tz)}`),
 
   createMeal: (meal: NewMeal) =>
     request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),

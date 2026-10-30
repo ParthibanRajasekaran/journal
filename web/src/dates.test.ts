@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { addDays, mondayOf, utcDay } from "./dates";
+import { addDays, localDay, mondayOf } from "./dates";
 
-describe("utcDay", () => {
-  it("formats a date as a UTC calendar day", () => {
-    expect(utcDay(new Date("2026-10-29T23:30:00Z"))).toBe("2026-10-29");
+describe("localDay", () => {
+  it("formats a date as the calendar day in the user's time zone", () => {
+    expect(localDay(new Date(2026, 9, 29, 23, 30))).toBe("2026-10-29");
   });
 });
 

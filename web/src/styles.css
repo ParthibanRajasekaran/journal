@@ -295,3 +295,20 @@ nav.tabs a.active { color: var(--accent); background: var(--accent-soft); }
 .google-btn:active { transform: scale(0.98); }
 .google-btn[aria-busy="true"] { opacity: 0.7; pointer-events: none; }
 .fine-print { margin: 14px 0 0; text-align: center; font-size: 13px; }
+
+/* Account deletion confirmation */
+.confirm { width: 100%; border: 1px solid rgba(180, 83, 9, 0.35); background: #fff7ed; border-radius: 14px; padding: 16px; margin-top: 8px; }
+.confirm h3 { margin: 0 0 6px; font-size: 16px; }
+.confirm p { margin: 0 0 12px; }
+button.danger-solid { background: #b91c1c; color: #fff; border-color: transparent; font-weight: 600; }
+
+/* Simpler Add meal */
+.meal-line { margin: 14px 0 4px; }
+.meal-summary { min-height: 40px; padding: 0 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.result { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.result-name { border: 0; padding: 0; min-height: 0; font-weight: 600; font-size: 16px; background: transparent; box-shadow: none; }
+.result-name:focus { box-shadow: none; outline: none; border-bottom: 1px solid var(--accent); border-radius: 0; }
+.big-kcal { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+.macro-line { font-size: 14px; margin-top: 2px; }
+.manual-name { margin-top: 12px; }

@@ -372,7 +372,7 @@ paths:
       - Meals
       operationId: createMeal
       parameters:
-      - &id003
+      - &id004
         $ref: '#/components/parameters/JournalRequest'
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -436,6 +436,16 @@ paths:
           $ref: '#/components/responses/Problem'
         '404':
           $ref: '#/components/responses/Problem'
+      parameters:
+      - &id003
+        name: tz
+        in: query
+        required: false
+        description: The user's IANA time zone, for example Europe/London. Default UTC.
+        schema:
+          type: string
+          maxLength: 60
+          default: UTC
   /week:
     get:
       tags:
@@ -448,6 +458,7 @@ paths:
         schema:
           type: string
           format: date
+      - *id003
       responses:
         '200':
           description: Seven daily totals
@@ -557,7 +568,7 @@ paths:
       operationId: updateMeal
       description: Requires If-Match with the current version.
       parameters:
-      - *id003
+      - *id004
       - name: If-Match
         in: header
         required: true
@@ -608,7 +619,7 @@ paths:
         '429':
           $ref: '#/components/responses/Problem'
       parameters:
-      - *id003
+      - *id004
   /me/ai-keys:
     get:
       tags:
@@ -624,7 +635,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AiKeyStatus'
-        '401': &id004
+        '401': &id005
           $ref: '#/components/responses/Problem'
   /me/ai-keys/{provider}:
     parameters:
@@ -644,7 +655,7 @@ paths:
       summary: Check a provider key and store it encrypted
       description: The key is checked with one read-only provider call before it is stored. The key is never returned.
       parameters:
-      - &id005
+      - &id006
         $ref: '#/components/parameters/JournalRequest'
       requestBody:
         required: true
@@ -659,11 +670,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AiKeyStatus'
-        '401': *id004
-        '403': *id004
-        '422': *id004
-        '429': *id004
-        '503': *id004
+        '401': *id005
+        '403': *id005
+        '422': *id005
+        '429': *id005
+        '503': *id005
         '400':
           $ref: '#/components/responses/Problem'
         '404':
@@ -674,14 +685,14 @@ paths:
       operationId: deleteAiKey
       summary: Remove a saved provider key
       parameters:
-      - *id005
+      - *id006
       responses:
         '204':
           description: Removed
-        '401': *id004
-        '403': *id004
-        '404': *id004
-        '429': *id004
+        '401': *id005
+        '403': *id005
+        '404': *id005
+        '429': *id005
 components:
   securitySchemes:
     bearerAuth:
@@ -879,7 +890,7 @@ components:
           type: string
           minLength: 3
           maxLength: 1000
-        provider: &id006
+        provider: &id007
           type: string
           enum:
           - openai
@@ -904,7 +915,7 @@ components:
             type: string
             enum:
             - needs_answers
-          provider: *id006
+          provider: *id007
           questions:
             type: array
             items:
@@ -920,7 +931,7 @@ components:
             type: string
             enum:
             - estimate
-          provider: *id006
+          provider: *id007
           estimate:
             $ref: '#/components/schemas/NutritionEstimate'
         additionalProperties: false

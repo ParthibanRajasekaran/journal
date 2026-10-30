@@ -187,17 +187,39 @@ function AddKey({ onSaved }: { onSaved: () => void }) {
 
 function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
-  if (!confirming) return <button className="danger" onClick={() => setConfirming(true)}>Delete account</button>;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!confirming) {
+    return <button className="danger" onClick={() => setConfirming(true)}>Delete account</button>;
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteAccount();
+      onDeleted();
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
   return (
-    <button
-      className="danger"
-      onClick={async () => {
-        await api.deleteAccount();
-        onDeleted();
-      }}
-    >
-      Yes, delete everything
-    </button>
+    <div className="confirm" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+      <h3 id="confirm-title">Delete your account?</h3>
+      <p id="confirm-body" className="muted">
+        This permanently removes your account, every meal you've logged, and your saved AI key. It cannot be undone.
+      </p>
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="row" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <button autoFocus onClick={() => setConfirming(false)} disabled={busy}>Keep my account</button>
+        <button className="danger-solid" onClick={remove} disabled={busy}>
+          {busy ? "Deleting…" : "Yes, delete everything"}
+        </button>
+      </div>
+    </div>
   );
 }
 

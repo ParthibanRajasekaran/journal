@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 import { api, Totals } from "../api";
-import { addDays, formatDay, mondayOf, utcDay } from "../dates";
+import { addDays, formatDay, localDay, mondayOf, userTz } from "../dates";
 
 interface Props {
   onOpenDay: (day: string) => void;
 }
 
 export function Week({ onOpenDay }: Props) {
-  const [start, setStart] = useState(() => mondayOf(utcDay()));
+  const [start, setStart] = useState(() => mondayOf(localDay()));
   const [days, setDays] = useState<Totals[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
     api
-      .week(start)
+      .week(start, userTz)
       .then(setDays)
       .catch((err: Error) => setError(err.message));
   }, [start]);

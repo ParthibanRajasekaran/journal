@@ -5,14 +5,14 @@ import { Today } from "./screens/Today";
 import { AddMeal } from "./screens/AddMeal";
 import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
-import { utcDay } from "./dates";
+import { localDay } from "./dates";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
 type Tab = "today" | "week" | "settings";
 
 export function App() {
   const [profile, setProfile] = useState<Profile | null | "loading">("loading");
-  const [screen, setScreen] = useState<Screen>({ name: "today", day: utcDay() });
+  const [screen, setScreen] = useState<Screen>({ name: "today", day: localDay() });
 
   useEffect(() => {
     api
@@ -35,7 +35,7 @@ export function App() {
     event.preventDefault();
     setScreen(next);
   };
-  const todayNow = (): Screen => ({ name: "today", day: utcDay() });
+  const todayNow = (): Screen => ({ name: "today", day: localDay() });
 
   return (
     <>
@@ -47,7 +47,7 @@ export function App() {
             <a href="#week" className={tab === "week" ? "active" : ""} onClick={go({ name: "week" })}>Week</a>
             <a href="#settings" className={tab === "settings" ? "active" : ""} onClick={go({ name: "settings" })}>Settings</a>
           </nav>
-          <button className="primary" onClick={() => setScreen({ name: "add", day: utcDay() })}>+ Add meal</button>
+          <button className="primary" onClick={() => setScreen({ name: "add", day: localDay() })}>+ Add meal</button>
           <button
             className="ghost"
             onClick={() => {

@@ -1,8 +1,11 @@
 // The API groups meals by UTC calendar day. The app uses the same days, so the
 // Today and Week screens match the server's totals.
 
-export function utcDay(date: Date = new Date()): string {
-  return date.toISOString().slice(0, 10);
+// "Today" and every day on screen are the user's own calendar days.
+export const userTz: string = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function localDay(date: Date = new Date()): string {
+  return date.toLocaleDateString("en-CA"); // YYYY-MM-DD in the user's time zone
 }
 
 export function addDays(day: string, delta: number): string {
@@ -27,5 +30,5 @@ export function formatDay(day: string): string {
 }
 
 export function timeOf(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }

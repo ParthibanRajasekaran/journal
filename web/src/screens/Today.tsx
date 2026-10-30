@@ -1,7 +1,7 @@
 import { CSSProperties, useCallback, useEffect, useState } from "react";
 import { api, DaySummary, Meal } from "../api";
 import { EditMeal } from "./EditMeal";
-import { addDays, formatDay, timeOf, utcDay } from "../dates";
+import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -19,7 +19,7 @@ export function Today({ day, onDayChange, onAdd }: Props) {
   const load = useCallback(() => {
     setError(null);
     api
-      .day(day)
+      .day(day, userTz)
       .then(setSummary)
       .catch((err: Error) => setError(err.message));
   }, [day]);
@@ -35,7 +35,7 @@ export function Today({ day, onDayChange, onAdd }: Props) {
     }
   }
 
-  const isToday = day === utcDay();
+  const isToday = day === localDay();
   return (
     <>
       <div className="row" style={{ marginBottom: 6 }}>
