@@ -43,6 +43,8 @@ export function SignIn() {
           className={`google-btn ${adult ? "" : "is-disabled"}`}
           href={adult ? api.signInUrl : undefined}
           aria-disabled={!adult}
+          // Stays reachable by keyboard while disabled, so its state can be heard and understood.
+          tabIndex={0}
           aria-busy={busy}
           onClick={(e) => {
             if (!adult) return e.preventDefault();

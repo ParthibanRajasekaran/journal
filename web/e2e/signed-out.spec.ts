@@ -44,3 +44,32 @@ test("the sign-in page raises no console errors", async ({ page }) => {
   await page.waitForLoadState("networkidle");
   expect(errors).toEqual([]);
 });
+
+test("an unknown address still shows the sign-in page", async ({ page }) => {
+  await page.goto("/this-page-does-not-exist");
+  await expect(page.getByText("Continue with Google")).toBeVisible();
+});
+
+test("a very long address does not break the page", async ({ page }) => {
+  await page.goto(`/?q=${"x".repeat(1500)}`);
+  await expect(page.getByText("Continue with Google")).toBeVisible();
+});
+
+test("a failed sign-in with extra parameters still shows the message once", async ({ page }) => {
+  await page.goto("/?signin=failed&state=abc&error=access_denied");
+  await expect(page.getByRole("alert")).toContainText("Sign-in didn't finish");
+});
+
+test("an unknown API route answers with a problem document, not a page", async ({ request }) => {
+  const response = await request.get("/api/v1/not-a-route");
+  expect(response.status()).toBe(404);
+  expect(response.headers()["content-type"]).toContain("application/problem+json");
+});
+
+test("the sign-in controls can be reached by keyboard", async ({ page }) => {
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  const focused = await page.evaluate(() => document.activeElement?.tagName);
+  expect(["INPUT", "A", "BUTTON"]).toContain(focused);
+});
