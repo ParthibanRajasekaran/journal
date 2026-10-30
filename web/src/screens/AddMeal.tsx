@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
 import { utcDay } from "../dates";
-import { TimePicker } from "./TimePicker";
+import { defaultMealFor, MealTimePicker, usualTime } from "./TimePicker";
 
 interface Props {
   day: string;
@@ -12,17 +12,10 @@ interface Props {
 const LIMITS = { calories: [0, 5000], protein_g: [0, 300], carbs_g: [0, 500], fat_g: [0, 300] } as const;
 const PROVIDER_NAME = { openai: "OpenAI", anthropic: "Claude", gemini: "Gemini" } as const;
 
-function defaultTime(day: string): string {
-  if (day !== utcDay()) return "12:00";
-  const d = new Date();
-  d.setMinutes(Math.round(d.getMinutes() / 5) * 5, 0, 0);
-  return d.toTimeString().slice(0, 5);
-}
-
 export function AddMeal({ day, onDone, onCancel }: Props) {
   const [name, setName] = useState("");
-  const [mealType, setMealType] = useState<Meal["meal_type"]>("lunch");
-  const [time, setTime] = useState(() => defaultTime(day));
+  const [mealType, setMealType] = useState<Meal["meal_type"]>(() => defaultMealFor());
+  const [time, setTime] = useState(() => usualTime(defaultMealFor()));
   const [values, setValues] = useState({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -189,17 +182,15 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
           <label htmlFor="name">What did you eat?</label>
           <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
         </div>
-        <div>
-          <label htmlFor="type">Meal</label>
-          <select id="type" value={mealType} onChange={(e) => setMealType(e.target.value as Meal["meal_type"])}>
-            <option value="breakfast">Breakfast</option>
-            <option value="lunch">Lunch</option>
-            <option value="dinner">Dinner</option>
-            <option value="snack">Snack</option>
-          </select>
-        </div>
         <div className="span-2">
-          <TimePicker value={time} onChange={setTime} />
+          <MealTimePicker
+            mealType={mealType}
+            time={time}
+            onChange={(choice) => {
+              setMealType(choice.mealType);
+              setTime(choice.time);
+            }}
+          />
         </div>
       </div>
 

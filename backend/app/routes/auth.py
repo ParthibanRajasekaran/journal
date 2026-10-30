@@ -1,9 +1,10 @@
 """Sign-in routes. The backend holds the client secret. Tokens travel only in HttpOnly cookies."""
 
 import secrets
+from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
 from app.auth import google, service
@@ -27,6 +28,13 @@ from app.auth.tokens import (
 )
 
 router = APIRouter(tags=["Auth"])
+
+SIGN_IN_FAILED = "/?signin=failed"
+
+
+def _failed() -> RedirectResponse:
+    """Sign-in did not complete. Send the user back to the sign-in page, not to a JSON error."""
+    return RedirectResponse(SIGN_IN_FAILED, status_code=303)
 
 
 def _redirect_uri(request: Request) -> str:
@@ -102,26 +110,26 @@ async def start_google_sign_in(request: Request) -> RedirectResponse:
 async def google_callback(
     request: Request,
     session: SessionDep,
-    code: str | None = None,
-    state: str | None = None,
-    error: str | None = None,
+    code: Annotated[str | None, Query(max_length=2048)] = None,
+    state: Annotated[str | None, Query(max_length=256)] = None,
+    error: Annotated[str | None, Query(max_length=128)] = None,
 ) -> RedirectResponse:
     settings = request.app.state.settings
     if error is not None or code is None or state is None:
-        raise HTTPException(status_code=400, detail="Sign-in was not completed.")
+        return _failed()
     key = auth_key(settings)
     if settings.google_client_id is None or settings.google_client_secret is None:
-        raise HTTPException(status_code=503, detail="Sign-in is not configured.")
+        return _failed()
 
     cookie = request.cookies.get(STATE_COOKIE)
     if cookie is None:
-        raise HTTPException(status_code=400, detail="Sign-in expired. Please try again.")
+        return _failed()
     try:
         expected = read_state_token(cookie, key)
-    except AuthError as exc:
-        raise HTTPException(status_code=400, detail="Sign-in expired. Please try again.") from exc
+    except AuthError:
+        return _failed()
     if not secrets.compare_digest(expected["state"], state):
-        raise HTTPException(status_code=400, detail="Sign-in could not be verified.")
+        return _failed()
 
     try:
         async with httpx.AsyncClient(timeout=10) as http:
@@ -139,12 +147,12 @@ async def google_callback(
             expected_nonce=expected["nonce"],
             keys=request.app.state.jwks,
         )
-    except (AuthError, httpx.HTTPError) as exc:
-        raise HTTPException(status_code=401, detail="Sign-in could not be verified.") from exc
+    except (AuthError, httpx.HTTPError):
+        return _failed()
 
     email = claims.get("email")
     if not isinstance(email, str):
-        raise HTTPException(status_code=400, detail="Sign-in needs an email address.")
+        return _failed()
     user = await service.upsert_user(
         session,
         google_sub=str(claims["sub"]),

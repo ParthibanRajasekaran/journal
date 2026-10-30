@@ -48,6 +48,14 @@ export function App() {
             <a href="#settings" className={tab === "settings" ? "active" : ""} onClick={go({ name: "settings" })}>Settings</a>
           </nav>
           <button className="primary" onClick={() => setScreen({ name: "add", day: utcDay() })}>+ Add meal</button>
+          <button
+            className="ghost"
+            onClick={() => {
+              api.logout().finally(() => setProfile(null));
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </header>
 

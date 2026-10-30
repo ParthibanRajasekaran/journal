@@ -146,7 +146,8 @@ def test_callback_without_state_cookie_is_refused(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     response = _callback(client, "anything", monkeypatch)
-    assert response.status_code == 400
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?signin=failed"
 
 
 def test_callback_with_mismatched_state_is_refused(
@@ -154,12 +155,14 @@ def test_callback_with_mismatched_state_is_refused(
 ) -> None:
     _start(client)
     response = _callback(client, "forged-state", monkeypatch)
-    assert response.status_code == 400
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?signin=failed"
 
 
 def test_callback_with_error_from_google_is_refused(client: TestClient) -> None:
     response = client.get("/api/v1/auth/google/callback", params={"error": "access_denied"})
-    assert response.status_code == 400
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?signin=failed"
 
 
 def test_successful_sign_in_sets_http_only_cookies_and_creates_the_user(
@@ -199,7 +202,8 @@ def test_forged_or_mismatched_id_tokens_are_refused(
     response = _callback(
         client, state, monkeypatch, nonce=nonce, id_token=make_id_token(**overrides)
     )
-    assert response.status_code == 401
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?signin=failed"
 
 
 def test_id_token_signed_by_another_key_is_refused(
@@ -222,7 +226,8 @@ def test_id_token_signed_by_another_key_is_refused(
         headers={"kid": "test"},
     )
     response = _callback(client, state, monkeypatch, nonce=nonce, id_token=forged)
-    assert response.status_code == 401
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?signin=failed"
 
 
 def test_same_google_account_signing_in_again_reuses_the_user(

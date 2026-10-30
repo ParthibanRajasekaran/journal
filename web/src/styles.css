@@ -272,3 +272,26 @@ nav.tabs a.active { color: var(--accent); background: var(--accent-soft); }
 .estimate-row { display: flex; gap: 10px; align-items: stretch; }
 .estimate-row textarea { flex: 1; font: inherit; color: var(--text); background: var(--surface); border: 1px solid #6b7280; border-radius: 12px; padding: 10px 14px; resize: vertical; min-height: 48px; }
 .estimate-row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.16); }
+.other-time { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.other-time span { color: var(--muted); font-size: 14px; }
+.other-time input { width: auto; min-width: 140px; }
+.other-link { margin-top: 6px; min-height: 36px; font-size: 14px; }
+
+/* Sign-in page */
+.signin { padding-top: 56px; text-align: center; }
+.signin-title { font-size: 40px; color: var(--accent); margin: 0; letter-spacing: -0.02em; }
+.tagline { color: var(--muted); margin: 6px 0 24px; }
+.signin-card { max-width: 420px; margin: 0 auto; padding: 28px 24px; text-align: left; }
+.promises { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
+.promises li { position: relative; padding-left: 26px; }
+.promises li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 48px;
+  padding: 0 18px; border-radius: 12px; border: 1px solid #747775; background: #fff; color: #1f1f1f;
+  font: 500 15px/1 "Inter", system-ui, sans-serif; text-decoration: none; cursor: pointer;
+  transition: background 200ms var(--ease), box-shadow 200ms var(--ease), transform 160ms var(--spring);
+}
+.google-btn:hover { background: #f7f8f8; box-shadow: 0 4px 14px -8px rgba(15, 23, 42, 0.4); }
+.google-btn:active { transform: scale(0.98); }
+.google-btn[aria-busy="true"] { opacity: 0.7; pointer-events: none; }
+.fine-print { margin: 14px 0 0; text-align: center; font-size: 13px; }
