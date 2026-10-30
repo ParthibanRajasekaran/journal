@@ -168,7 +168,7 @@ def test_successful_sign_in_sets_http_only_cookies_and_creates_the_user(
     state, nonce = _start(client)
     response = _callback(client, state, monkeypatch, nonce=nonce)
     assert response.status_code == 303
-    assert response.headers["location"] == "/api/v1/me"
+    assert response.headers["location"] == "/"
     set_cookie = " ".join(response.headers.get_list("set-cookie")).lower()
     assert "journal_access=" in set_cookie
     assert "journal_refresh=" in set_cookie

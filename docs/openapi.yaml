@@ -87,7 +87,7 @@ paths:
           maxLength: 128
       responses:
         '303':
-          description: Signed in; cookies set. Redirects to /api/v1/me.
+          description: Signed in; cookies set. Redirects to the app's home page.
           headers:
             Location:
               schema:

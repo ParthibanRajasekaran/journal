@@ -157,7 +157,7 @@ async def google_callback(
     await session.commit()
 
     access = issue_access_token(user.id, key, settings.access_token_ttl_seconds)
-    response = RedirectResponse("/api/v1/me", status_code=303)
+    response = RedirectResponse("/", status_code=303)
     _set_session_cookies(response, request, access, refresh)
     response.delete_cookie(STATE_COOKIE, path=STATE_PATH)
     return response
