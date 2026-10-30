@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 import { api, AiKeyStatus, Profile, Provider } from "../api";
 
 interface Props {
@@ -79,10 +79,23 @@ function AiKeys() {
 
   return (
     <section className="card">
-      <h2 style={{ marginTop: 0 }}>Your AI key</h2>
-      <p className="muted">
-        Use your own provider account. Your key is checked once, stored encrypted, and never shown again.
-      </p>
+      <div className="row" style={{ justifyContent: "flex-start" }}>
+        <h2 style={{ marginTop: 0 }}>Your AI key</h2>
+        <InfoTip label="What is an AI key?">
+          <p style={{ marginTop: 0 }}>
+            Journal can estimate what's in a meal for you. To do that, it needs access to an AI service.
+            Instead of using ours, you connect your own account with OpenAI, Anthropic (Claude), or Google Gemini.
+          </p>
+          <p>
+            The key is a code your provider gives you, like a password for their service. It lets Journal make
+            requests on your account, so you pay your provider directly for what you use.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            We check the key once, store it encrypted, and never show it again. You can remove it at any time.
+          </p>
+        </InfoTip>
+      </div>
+      <p className="muted">Your key is checked once, stored encrypted, and never shown again.</p>
       {error && <p className="error" role="alert">{error}</p>}
       {keys.length > 0 && (
         <ul className="plain">
@@ -179,5 +192,30 @@ function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
     >
       Yes, delete everything
     </button>
+  );
+}
+
+function InfoTip({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <span style={{ position: "relative", display: "inline-block", marginTop: 8 }}>
+      <button
+        type="button"
+        className="ghost icon-btn"
+        style={{ width: 32, minHeight: 32, fontSize: 15, padding: 0 }}
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((v) => !v)}
+      >
+        ⓘ
+      </button>
+      {open && (
+        <div id={id} role="note" className="card info-panel">
+          {children}
+        </div>
+      )}
+    </span>
   );
 }
