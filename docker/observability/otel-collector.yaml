@@ -30,10 +30,10 @@ processors:
     spike_limit_mib: 50
   # Keep only the API's own JSON log lines. Access logs and database logs stay out of Loki.
   filter/api_logs:
-    error_mode: ignore
+    error_mode: propagate
     logs:
       log_record:
-        - 'not IsMatch(body, ".*\"logger\": ?\"journal.*")'
+        - 'not IsMatch(body, "logger.{1,5}journal")'
   # Second line of defence: drop request headers and bodies even if application code adds them.
   attributes/redact:
     actions:
