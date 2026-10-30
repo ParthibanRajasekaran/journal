@@ -38,3 +38,7 @@ __pycache__/
 # Web app build output and packages
 web/node_modules/
 web/dist/
+
+# Playwright output
+web/test-results/
+web/playwright-report/
