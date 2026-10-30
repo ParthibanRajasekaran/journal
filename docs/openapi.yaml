@@ -300,7 +300,7 @@ paths:
       tags:
       - Estimates
       operationId: createEstimate
-      summary: Estimate nutrition from a photo or text. Saves nothing.
+      summary: Estimate a meal from a text description, using the user's own AI key
       requestBody:
         required: true
         content:
@@ -309,19 +309,21 @@ paths:
               $ref: '#/components/schemas/EstimateRequest'
       responses:
         '200':
-          description: Validated estimate
+          description: Estimate (not saved)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EstimateResponse'
-        '403':
+        '400': &id002
           $ref: '#/components/responses/Problem'
-        '422':
-          $ref: '#/components/responses/Problem'
-        '429':
-          $ref: '#/components/responses/Problem'
-        '503':
-          $ref: '#/components/responses/Problem'
+        '401': *id002
+        '403': *id002
+        '409': *id002
+        '422': *id002
+        '429': *id002
+        '503': *id002
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
   /meals:
     get:
       tags:
@@ -370,7 +372,7 @@ paths:
       - Meals
       operationId: createMeal
       parameters:
-      - &id002
+      - &id003
         $ref: '#/components/parameters/JournalRequest'
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -555,7 +557,7 @@ paths:
       operationId: updateMeal
       description: Requires If-Match with the current version.
       parameters:
-      - *id002
+      - *id003
       - name: If-Match
         in: header
         required: true
@@ -606,7 +608,7 @@ paths:
         '429':
           $ref: '#/components/responses/Problem'
       parameters:
-      - *id002
+      - *id003
   /me/ai-keys:
     get:
       tags:
@@ -622,7 +624,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AiKeyStatus'
-        '401': &id003
+        '401': &id004
           $ref: '#/components/responses/Problem'
   /me/ai-keys/{provider}:
     parameters:
@@ -642,7 +644,7 @@ paths:
       summary: Check a provider key and store it encrypted
       description: The key is checked with one read-only provider call before it is stored. The key is never returned.
       parameters:
-      - &id004
+      - &id005
         $ref: '#/components/parameters/JournalRequest'
       requestBody:
         required: true
@@ -657,11 +659,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AiKeyStatus'
-        '401': *id003
-        '403': *id003
-        '422': *id003
-        '429': *id003
-        '503': *id003
+        '401': *id004
+        '403': *id004
+        '422': *id004
+        '429': *id004
+        '503': *id004
         '400':
           $ref: '#/components/responses/Problem'
         '404':
@@ -672,14 +674,14 @@ paths:
       operationId: deleteAiKey
       summary: Remove a saved provider key
       parameters:
-      - *id004
+      - *id005
       responses:
         '204':
           description: Removed
-        '401': *id003
-        '403': *id003
-        '404': *id003
-        '429': *id003
+        '401': *id004
+        '403': *id004
+        '404': *id004
+        '429': *id004
 components:
   securitySchemes:
     bearerAuth:
@@ -870,43 +872,42 @@ components:
           format: date-time
     EstimateRequest:
       type: object
-      oneOf:
-      - required:
-        - photo_id
-      - required:
-        - text
+      required:
+      - text
       properties:
-        photo_id:
-          type: string
-          pattern: ^ph_[0-9A-Za-z]+$
         text:
           type: string
-          minLength: 1
+          minLength: 3
           maxLength: 1000
+          description: What was eaten, in the user's words
+        provider:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - gemini
+          description: Optional. Defaults to the first saved key.
       additionalProperties: false
     EstimateResponse:
       type: object
       required:
-      - estimate_id
       - provider
       - estimate
       properties:
-        estimate_id:
-          type: string
         provider:
           type: string
           enum:
-          - gemini
           - openai
           - anthropic
+          - gemini
         estimate:
           $ref: '#/components/schemas/NutritionEstimate'
+      additionalProperties: false
     NutritionEstimate:
-      description: 'Field names follow ADR-001. Pending decision 2 in docs/progress.md: ADR-005 proposes calories_kcal and a low|medium|high confidence. Adding is_food is required by ADR-006.'
       type: object
+      description: 'Checked before it is returned: in range (refused, never clamped), macros roughly match calories, confident enough. Nothing is saved.'
       required:
       - name
-      - meal_type
       - calories
       - protein_g
       - carbs_g
@@ -916,13 +917,6 @@ components:
         name:
           type: string
           maxLength: 120
-        meal_type:
-          type: string
-          enum:
-          - breakfast
-          - lunch
-          - dinner
-          - snack
         calories:
           type: number
           minimum: 0

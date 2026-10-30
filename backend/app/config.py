@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     oauth_state_ttl_seconds: int = 600
 
+    # Models used for estimates. Check each name against the provider's model list before launch.
+    estimate_model_openai: str = "gpt-4o-mini"
+    estimate_model_anthropic: str = "claude-haiku-5-5"
+    estimate_model_gemini: str = "gemini-2.5-flash"
+
     # Encrypts stored provider keys. 32 random bytes, base64. Never stored in the database.
     key_encryption_key: SecretStr | None = None
 

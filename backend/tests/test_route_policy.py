@@ -28,6 +28,7 @@ PROTECTED_API_ROUTES = {
     (f"{API_PREFIX}/me", "delete"),
     (f"{API_PREFIX}/days/{{date}}", "get"),
     (f"{API_PREFIX}/week", "get"),
+    (f"{API_PREFIX}/estimates", "post"),
     (f"{API_PREFIX}/me/ai-keys", "get"),
     (f"{API_PREFIX}/me/ai-keys/{{provider}}", "put"),
     (f"{API_PREFIX}/me/ai-keys/{{provider}}", "delete"),
@@ -87,6 +88,8 @@ def test_protected_route_refuses_anonymous_callers(
         body = {"display_name": "Someone"}
     if path.endswith("/ai-keys/openai") and method == "put":
         body = {"api_key": "sk-" + "a" * 30, "acknowledge_provider_terms": True}
+    if path.endswith("/estimates"):
+        body = {"text": "two eggs on toast"}
     if path.endswith("/week"):
         concrete = f"{path}?start=2026-10-26"
     response = client.request(method.upper(), concrete, headers=headers, json=body)
