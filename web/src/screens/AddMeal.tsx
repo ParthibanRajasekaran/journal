@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
-import { api, ApiError, Meal } from "../api";
+import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
 import { utcDay } from "../dates";
+import { TimePicker } from "./TimePicker";
 
 interface Props {
   day: string;
@@ -8,38 +9,59 @@ interface Props {
   onCancel: () => void;
 }
 
-// Matches the API's limits, so the form reports problems before the server does.
 const LIMITS = { calories: [0, 5000], protein_g: [0, 300], carbs_g: [0, 500], fat_g: [0, 300] } as const;
+const PROVIDER_NAME = { openai: "OpenAI", anthropic: "Claude", gemini: "Gemini" } as const;
+
+function defaultTime(day: string): string {
+  if (day !== utcDay()) return "12:00";
+  const d = new Date();
+  d.setMinutes(Math.round(d.getMinutes() / 5) * 5, 0, 0);
+  return d.toTimeString().slice(0, 5);
+}
 
 export function AddMeal({ day, onDone, onCancel }: Props) {
   const [name, setName] = useState("");
   const [mealType, setMealType] = useState<Meal["meal_type"]>("lunch");
-  const [time, setTime] = useState(() => new Date().toISOString().slice(11, 16));
+  const [time, setTime] = useState(() => defaultTime(day));
   const [values, setValues] = useState({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
   const [describing, setDescribing] = useState("");
   const [estimating, setEstimating] = useState(false);
-  const [estimateNote, setEstimateNote] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<EstimateQuestion[] | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [items, setItems] = useState<EstimateItem[]>([]);
+  const [assumptions, setAssumptions] = useState<string[]>([]);
+  const [note, setNote] = useState<string | null>(null);
 
-  async function estimate() {
+  function applyEstimate(result: Awaited<ReturnType<typeof api.estimate>>) {
+    if (result.status === "needs_answers") {
+      setQuestions(result.questions);
+      setAnswers({});
+      return;
+    }
+    const e = result.estimate;
+    setQuestions(null);
+    setItems(e.items);
+    setAssumptions(e.assumptions);
+    setName((current) => (current.trim() ? current : e.name));
+    setValues({
+      calories: String(Math.round(e.calories)),
+      protein_g: String(Math.round(e.protein_g)),
+      carbs_g: String(Math.round(e.carbs_g)),
+      fat_g: String(Math.round(e.fat_g)),
+    });
+    setNote(`Estimated with your ${PROVIDER_NAME[result.provider]} key. Check the numbers, then save.`);
+  }
+
+  async function estimate(withAnswers?: SuppliedAnswer[]) {
     setError(null);
-    setEstimateNote(null);
-    if (describing.trim().length < 3) return setError("Describe what you ate first.");
+    setNote(null);
+    if (!withAnswers && describing.trim().length < 3) return setError("Describe what you ate first.");
     setEstimating(true);
     try {
-      const result = await api.estimate(describing.trim());
-      const e = result.estimate;
-      setName((current) => (current.trim() ? current : e.name));
-      setValues({
-        calories: String(Math.round(e.calories)),
-        protein_g: String(Math.round(e.protein_g)),
-        carbs_g: String(Math.round(e.carbs_g)),
-        fat_g: String(Math.round(e.fat_g)),
-      });
-      setEstimateNote(
-        `Estimated with your ${result.provider === "openai" ? "OpenAI" : result.provider === "anthropic" ? "Claude" : "Gemini"} key. Check the numbers, then save.`,
-      );
+      applyEstimate(await api.estimate(describing.trim(), withAnswers));
     } catch (err) {
       const e = err as ApiError;
       setError(e.status === 409 ? "Add your AI key in Settings to estimate meals." : e.message);
@@ -48,14 +70,23 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     }
   }
 
+  function answerAll() {
+    const supplied: SuppliedAnswer[] = (questions ?? []).map((q) => ({
+      ...q,
+      answer: answers[q.id] ?? "unsure",
+    }));
+    setQuestions(null);
+    void estimate(supplied);
+  }
+
   function problem(): string | null {
     if (name.trim().length === 0) return "Give the meal a name.";
-    if (name.length > 120) return "The name is too long.";
     for (const [field, [min, max]] of Object.entries(LIMITS)) {
       const raw = values[field as keyof typeof values];
-      if (raw === "") return `Enter ${field.replace("_g", "").replace("_", " ")}.`;
       const number = Number(raw);
-      if (Number.isNaN(number) || number < min || number > max) return `${field.replace("_g", "")} must be between ${min} and ${max}.`;
+      if (raw === "" || Number.isNaN(number) || number < min || number > max) {
+        return `${field.replace("_g", "")} must be between ${min} and ${max}.`;
+      }
     }
     return null;
   }
@@ -70,7 +101,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
       await api.createMeal({
         client_id: crypto.randomUUID(),
         meal_type: mealType,
-        eaten_at: new Date(`${day}T${time}:00Z`).toISOString(),
+        // The time is picked in the user's own time zone, then stored as an absolute instant.
+        eaten_at: new Date(`${day}T${time}:00`).toISOString(),
         name: name.trim(),
         calories: Number(values.calories),
         protein_g: Number(values.protein_g),
@@ -100,45 +132,82 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
             onChange={(e) => setDescribing(e.target.value)}
             placeholder="e.g. 4 poori with 5 spoons of paneer butter masala"
           />
-          <button type="button" className="primary" onClick={estimate} disabled={estimating}>
+          <button type="button" className="primary" onClick={() => estimate()} disabled={estimating}>
             {estimating ? "Working…" : "Estimate"}
           </button>
         </div>
-        {estimateNote && <p className="muted" role="status">{estimateNote}</p>}
+
+        {questions && (
+          <div className="questions" role="group" aria-label="A few quick questions">
+            {questions.map((q) => (
+              <fieldset key={q.id} className="question">
+                <legend>{q.question}</legend>
+                <div className="chips">
+                  {[...q.options, "I don't know"].map((option) => {
+                    const value = option === "I don't know" ? "unsure" : option;
+                    const on = (answers[q.id] ?? "unsure") === value;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={on}
+                        className={`chip ${on ? "chip-on" : ""}`}
+                        onClick={() => setAnswers({ ...answers, [q.id]: value })}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="muted" style={{ margin: "6px 0 0" }}>If you're not sure, choose "I don't know" and we'll use {q.default}.</p>
+              </fieldset>
+            ))}
+            <button type="button" className="primary" onClick={answerAll} disabled={estimating}>Continue</button>
+          </div>
+        )}
+
+        {note && <p className="muted" role="status">{note}</p>}
+        {assumptions.length > 0 && (
+          <ul className="assumptions">
+            {assumptions.map((a) => <li key={a}>{a}</li>)}
+          </ul>
+        )}
+        {items.length > 0 && (
+          <ul className="items">
+            {items.map((item) => (
+              <li key={item.name}>
+                <span>{item.name}</span>
+                <span className="num muted">{Math.round(item.calories)} kcal</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="form-grid">
-      <div className="span-2">
-      <label htmlFor="name">What did you eat?</label>
-      <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
-      </div>
-
-      <div>
-      <label htmlFor="type">Meal</label>
-      <select id="type" value={mealType} onChange={(e) => setMealType(e.target.value as Meal["meal_type"])}>
-        <option value="breakfast">Breakfast</option>
-        <option value="lunch">Lunch</option>
-        <option value="dinner">Dinner</option>
-        <option value="snack">Snack</option>
-      </select>
-
-      </div>
-      <div>
-      <label htmlFor="time">Time (UTC)</label>
-      <input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-      </div>
+        <div className="span-2">
+          <label htmlFor="name">What did you eat?</label>
+          <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
+        </div>
+        <div>
+          <label htmlFor="type">Meal</label>
+          <select id="type" value={mealType} onChange={(e) => setMealType(e.target.value as Meal["meal_type"])}>
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snack">Snack</option>
+          </select>
+        </div>
+        <div className="span-2">
+          <TimePicker value={time} onChange={setTime} />
+        </div>
       </div>
 
       <div className="macro-grid">
         {(Object.keys(LIMITS) as (keyof typeof LIMITS)[]).map((field) => (
-          <div key={field} style={{ flex: 1 }}>
+          <div key={field}>
             <label htmlFor={field}>{field === "calories" ? "Calories (kcal)" : field.replace("_g", "") + " (g)"}</label>
-            <input
-              id={field}
-              inputMode="decimal"
-              value={values[field]}
-              onChange={(e) => setValues({ ...values, [field]: e.target.value })}
-            />
+            <input id={field} inputMode="decimal" value={values[field]} onChange={(e) => setValues({ ...values, [field]: e.target.value })} />
           </div>
         ))}
       </div>
@@ -149,7 +218,6 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
         <button type="button" onClick={onCancel}>Cancel</button>
         <button type="submit" className="primary" disabled={saving}>{saving ? "Saving…" : "Save meal"}</button>
       </div>
-      <p className="muted">Enter the numbers from the label or your own estimate. Estimates from photos come later.</p>
     </form>
   );
 }

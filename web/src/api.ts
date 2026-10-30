@@ -65,6 +65,42 @@ export interface NewMeal {
   source: "manual";
 }
 
+export interface EstimateQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  default: string;
+}
+
+export interface SuppliedAnswer extends EstimateQuestion {
+  answer: string;
+}
+
+export interface EstimateItem {
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export type EstimateReply =
+  | { status: "needs_answers"; provider: Provider; questions: EstimateQuestion[] }
+  | {
+      status: "estimate";
+      provider: Provider;
+      estimate: {
+        name: string;
+        calories: number;
+        protein_g: number;
+        carbs_g: number;
+        fat_g: number;
+        confidence: number;
+        items: EstimateItem[];
+        assumptions: string[];
+      };
+    };
+
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
 const BASE = "/api/v1";
 
@@ -109,11 +145,8 @@ export const api = {
     request<Meal>("PATCH", `/meals/${meal.id}`, patch, { "If-Match": String(meal.version) }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),
 
-  estimate: (text: string) =>
-    request<{
-      provider: Provider;
-      estimate: { name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; confidence: number };
-    }>("POST", "/estimates", { text }),
+  estimate: (text: string, answers?: SuppliedAnswer[]) =>
+    request<EstimateReply>("POST", "/estimates", answers ? { text, answers } : { text }),
 
   aiKeys: () => request<AiKeyStatus[]>("GET", "/me/ai-keys"),
   saveAiKey: (provider: Provider, apiKey: string) =>
