@@ -1,6 +1,7 @@
 import { CSSProperties, useCallback, useEffect, useState } from "react";
 import { api, DaySummary, Meal } from "../api";
 import { EditMeal } from "./EditMeal";
+import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 import { savedLine } from "../encouragement";
 
@@ -71,6 +72,7 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
         <div className="today-grid">
           <section>
             <SummaryCard summary={summary} />
+            <MacroSplit totals={summary} />
             <button className="primary add-inline" style={{ width: "100%", marginBottom: 14 }} onClick={onAdd}>Add meal</button>
           </section>
           <section>
