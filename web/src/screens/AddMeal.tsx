@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
+import { api, ApiError, EstimateItem, EstimateQuestion, Meal, NewMeal, SuppliedAnswer } from "../api";
 import { localDay, momentOf } from "../dates";
 import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
+import { enqueue } from "../offline";
 import { Hourglass as HourglassIcon } from "lucide-react";
 
 interface Props {
@@ -149,21 +150,28 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     if (failure) return setError(failure);
     setError(null);
     setSaving(true);
+    const meal: NewMeal = {
+      client_id: crypto.randomUUID(),
+      meal_type: mealType,
+      // Stored as an exact moment, from the time picked in the user's own time zone.
+      eaten_at: momentOf(day, time),
+      name: name.trim(),
+      calories: Number(values.calories),
+      protein_g: Number(values.protein_g),
+      carbs_g: Number(values.carbs_g),
+      fat_g: Number(values.fat_g),
+      source: sourceFor(),
+    };
     try {
-      await api.createMeal({
-        client_id: crypto.randomUUID(),
-        meal_type: mealType,
-        // Stored as an exact moment, from the time picked in the user's own time zone.
-        eaten_at: momentOf(day, time),
-        name: name.trim(),
-        calories: Number(values.calories),
-        protein_g: Number(values.protein_g),
-        carbs_g: Number(values.carbs_g),
-        fat_g: Number(values.fat_g),
-        source: sourceFor(),
-      });
+      await api.createMeal(meal);
       onDone();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        // No connection: keep the meal on this device and send it when back online.
+        enqueue(meal);
+        onDone();
+        return;
+      }
       setError((err as Error).message);
     } finally {
       setSaving(false);

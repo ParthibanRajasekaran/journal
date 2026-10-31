@@ -407,3 +407,4 @@ fieldset.question legend { font-weight: 600; padding: 0 6px; }
 .switch-row strong { display: block; margin-bottom: 2px; }
 .segment-set { border: 0; padding: 0; margin: 12px 0 0; min-width: 0; }
 .segment-set legend { font-size: 14px; color: var(--muted); padding: 0; margin-bottom: 8px; }
+.waiting-note { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-strong); color: var(--muted); font-size: 15px; }
