@@ -1,6 +1,7 @@
 """Sign-in routes. The backend holds the client secret. Tokens travel only in HttpOnly cookies."""
 
 import secrets
+from datetime import UTC, datetime
 from typing import Annotated
 
 import httpx
@@ -72,7 +73,11 @@ def _clear_session_cookies(response: Response) -> None:
 
 
 @router.get("/auth/google/start", operation_id="startGoogleSignIn")
-async def start_google_sign_in(request: Request) -> RedirectResponse:
+async def start_google_sign_in(
+    request: Request,
+    adult: Annotated[bool, Query()] = False,
+) -> RedirectResponse:
+    """Start Google sign-in. adult=true means the user confirmed they are 18 or older."""
     settings = request.app.state.settings
     if settings.google_client_id is None:
         raise HTTPException(status_code=503, detail="Sign-in is not configured.")
@@ -91,7 +96,9 @@ async def start_google_sign_in(request: Request) -> RedirectResponse:
     response = RedirectResponse(url, status_code=302)
     response.set_cookie(
         STATE_COOKIE,
-        issue_state_token(state, nonce, verifier, key, settings.oauth_state_ttl_seconds),
+        issue_state_token(
+            state, nonce, verifier, key, settings.oauth_state_ttl_seconds, adult=adult
+        ),
         max_age=settings.oauth_state_ttl_seconds,
         httponly=True,
         secure=settings.cookie_secure,
@@ -159,6 +166,12 @@ async def google_callback(
         email=email,
         name=claims.get("name") if isinstance(claims.get("name"), str) else None,
     )
+    if user.adult_confirmed_at is None:
+        # The first sign-in must carry the 18+ confirmation. It is then kept for the account.
+        if expected["adult"] != "1":
+            await session.rollback()
+            return RedirectResponse("/?signin=adult", status_code=303)
+        user.adult_confirmed_at = datetime.now(UTC)
     refresh = await service.start_session(
         session, user_id=user.id, ttl_days=settings.refresh_token_ttl_days
     )

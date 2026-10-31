@@ -36,6 +36,14 @@ paths:
       - Auth
       operationId: startGoogleSignIn
       summary: Redirect the browser to Google to sign in
+      parameters:
+      - name: adult
+        in: query
+        required: false
+        description: True when the user confirmed they are 18 or older. Required on a user's first sign-in; recorded once for the account.
+        schema:
+          type: boolean
+          default: false
       description: 'Sets a short-lived, HttpOnly state cookie holding state, nonce, and the PKCE
 
         verifier. The client secret stays on the server (ADR-004).
@@ -50,6 +58,8 @@ paths:
               schema:
                 type: string
                 format: uri
+        '422':
+          $ref: '#/components/responses/Problem'
         '503':
           $ref: '#/components/responses/Problem'
   /auth/google/callback:
