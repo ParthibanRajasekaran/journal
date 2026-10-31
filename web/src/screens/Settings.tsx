@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useId, useState } from "react";
 import { api, AiKeyStatus, Profile, Provider } from "../api";
 import { PROVIDERS as KEY_PAGES } from "./KeyHelp";
+import { discardOwner } from "../offline";
 
 interface Props {
   profile: Profile;
@@ -27,7 +28,7 @@ export function Settings({ profile, onProfile, onSignedOut }: Props) {
             <p className="muted">Signed in as {profile.email}</p>
             <div className="row" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
               <button onClick={() => api.logout().then(onSignedOut)}>Sign out</button>
-              <DeleteAccount onDeleted={onSignedOut} />
+              <DeleteAccount owner={profile.id} onDeleted={onSignedOut} />
             </div>
           </section>
         </div>
@@ -259,7 +260,7 @@ function AddKey({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
+function DeleteAccount({ owner, onDeleted }: { owner: string; onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -273,6 +274,9 @@ function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
     setError(null);
     try {
       await api.deleteAccount();
+      // Meals still waiting on this device belong to the deleted account. Drop them now, so they
+      // cannot be sent after the account no longer exists.
+      discardOwner(owner);
       onDeleted();
     } catch (err) {
       setError((err as Error).message);

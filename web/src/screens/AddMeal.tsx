@@ -6,23 +6,26 @@ import { KeyHelp } from "./KeyHelp";
 import { enqueue } from "../offline";
 
 // The meal being typed is kept for this browser session, so a reload or a detour to add a key does
-// not lose it. It is cleared once the meal is saved or the user cancels.
+// not lose it. It is cleared once the meal is saved or the user cancels. The draft belongs to the
+// account that started it, so another account signing in on this tab never sees it.
 const DRAFT_KEY = "journal.add-draft";
 type Draft = { describing: string; name: string; time: string; mealType: Meal["meal_type"]; values: Values; manual: boolean };
 
-function readDraft(): Draft | null {
+const draftKey = (owner: string) => `${DRAFT_KEY}:${owner}`;
+
+function readDraft(owner: string): Draft | null {
   try {
-    const parsed: unknown = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null");
+    const parsed: unknown = JSON.parse(sessionStorage.getItem(draftKey(owner)) ?? "null");
     return parsed && typeof parsed === "object" ? (parsed as Draft) : null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(draft: Draft | null): void {
+function writeDraft(owner: string, draft: Draft | null): void {
   try {
-    if (draft) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    else sessionStorage.removeItem(DRAFT_KEY);
+    if (draft) sessionStorage.setItem(draftKey(owner), JSON.stringify(draft));
+    else sessionStorage.removeItem(draftKey(owner));
   } catch {
     // Storage can be blocked. The draft is then simply not kept.
   }
@@ -30,10 +33,14 @@ function writeDraft(draft: Draft | null): void {
 import { Hourglass as HourglassIcon } from "lucide-react";
 
 interface Props {
+  owner: string;
   day: string;
   onDone: () => void;
   onCancel: () => void;
 }
+
+// Shown when this device cannot keep the meal. The form stays as it is so nothing is lost.
+const STORAGE_FAILED = "Journal can't keep this meal on your phone right now, so it isn't saved yet. Your entries are still here. Try again, or free up some space.";
 
 const LIMITS = { calories: [0, 5000], protein_g: [0, 300], carbs_g: [0, 500], fat_g: [0, 300] } as const;
 const PROVIDER_NAME = { openai: "OpenAI", anthropic: "Claude", gemini: "Gemini" } as const;
@@ -49,8 +56,8 @@ interface Estimated {
 const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g: "protein g", carbs_g: "carbs g", fat_g: "fat g" };
 
 // One path: describe, check the estimate, save. Numbers are typed only when asked for.
-export function AddMeal({ day, onDone, onCancel }: Props) {
-  const [draft] = useState(readDraft);
+export function AddMeal({ owner, day, onDone, onCancel }: Props) {
+  const [draft] = useState(() => readDraft(owner));
   const [name, setName] = useState(draft?.name ?? "");
   const [start] = useState(nowRounded);
   const [mealType, setMealType] = useState<Meal["meal_type"]>(draft?.mealType ?? mealFor(start));
@@ -77,8 +84,8 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
 
   // Keep the draft up to date as the user types, so a reload brings it back.
   useEffect(() => {
-    writeDraft({ describing, name, time, mealType, values, manual });
-  }, [describing, name, time, mealType, values, manual]);
+    writeDraft(owner, { describing, name, time, mealType, values, manual });
+  }, [owner, describing, name, time, mealType, values, manual]);
   const nameRef = useRef<HTMLInputElement>(null);
   const questionsRef = useRef<HTMLDivElement>(null);
 
@@ -193,13 +200,18 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     };
     try {
       await api.createMeal(meal);
-      writeDraft(null);
+      writeDraft(owner, null);
       onDone();
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        // No connection: keep the meal on this device and send it when back online.
-        enqueue(meal);
-        writeDraft(null);
+        // No connection: keep the meal on this device and send it when back online. Only report it
+        // as saved once the device has actually kept it; otherwise the form stays as it is.
+        const kept = enqueue(owner, meal);
+        if (!kept.ok) {
+          setError(STORAGE_FAILED);
+          return;
+        }
+        writeDraft(owner, null);
         onDone();
         return;
       }
@@ -215,7 +227,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   function cancel() {
     if (unsaved) setConfirmCancel(true);
     else {
-      writeDraft(null);
+      writeDraft(owner, null);
       onCancel();
     }
   }
@@ -373,7 +385,7 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
               type="button"
               className="danger-solid"
               onClick={() => {
-                writeDraft(null);
+                writeDraft(owner, null);
                 onCancel();
               }}
             >

@@ -4,13 +4,14 @@ import { EditMeal } from "./EditMeal";
 import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 import { savedLine } from "../encouragement";
-import { readQueue } from "../offline";
+import { OUTBOX_EVENT, flushQueue, readQueue, retryBlocked } from "../offline";
 import { Hand, Heart, ThumbsUp, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 const MEAL_ORDER: Meal["meal_type"][] = ["breakfast", "lunch", "dinner", "snack", "other"];
 
 interface Props {
+  owner: string;
   day: string;
   onDayChange: (day: string) => void;
   onAdd: () => void;
@@ -22,20 +23,26 @@ interface Props {
 // Lucide has no clapping hands, so the open hand stands in for it.
 const SAVED_ICONS: LucideIcon[] = [ThumbsUp, Hand, Heart];
 
-export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
+export function Today({ owner, day, onDayChange, onAdd, savedNote }: Props) {
   const [summary, setSummary] = useState<DaySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(savedNote);
-  // Meals waiting on this device to be sent once the connection is back.
-  const [waiting, setWaiting] = useState(() => readQueue().length);
+  // Meals this account saved on this device that have not reached the server yet.
+  const [waiting, setWaiting] = useState(() => readQueue(owner));
+  const pending = waiting.filter((e) => e.state === "pending").length;
+  const blocked = waiting.filter((e) => e.state === "blocked").length;
   useEffect(() => {
-    const refresh = () => setWaiting(readQueue().length);
+    const refresh = () => setWaiting(readQueue(owner));
     window.addEventListener("online", refresh);
+    window.addEventListener(OUTBOX_EVENT, refresh);
     refresh();
-    return () => window.removeEventListener("online", refresh);
-  }, []);
+    return () => {
+      window.removeEventListener("online", refresh);
+      window.removeEventListener(OUTBOX_EVENT, refresh);
+    };
+  }, [owner]);
   const [SavedIcon] = useState(() => SAVED_ICONS[Math.floor(Math.random() * SAVED_ICONS.length)]);
   const reduceMotion = useReducedMotion();
 
@@ -79,9 +86,23 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
 
       {error && summary && <p className="error" role="alert">{error}</p>}
 
-      {waiting > 0 && (
+      {pending > 0 && (
         <p className="waiting-note" role="status">
-          {waiting === 1 ? "1 meal" : `${waiting} meals`} saved on this device, waiting to sync.
+          {pending === 1 ? "1 meal" : `${pending} meals`} saved on this device, waiting to sync.
+        </p>
+      )}
+      {blocked > 0 && (
+        <p className="error" role="alert">
+          {blocked === 1 ? "1 saved meal" : `${blocked} saved meals`} couldn't be sent.{" "}
+          <button
+            className="ghost"
+            onClick={() => {
+              retryBlocked(owner);
+              void flushQueue(owner);
+            }}
+          >
+            Try again
+          </button>
         </p>
       )}
 
