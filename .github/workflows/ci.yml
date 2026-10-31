@@ -52,3 +52,33 @@ jobs:
 
       - name: Make check
         run: make check
+
+  # Change-set policy (bootstrap). The checker runs from a trusted checkout of the BASE commit; the pull request
+  # is read as data and its code is never executed. NOT a required status until the owner enables branch
+  # protection (see docs/factory/proposals/ci-policy-check.md). Requiring the name alone is insufficient: a pull
+  # request can replace this job's command, so the workflow file itself needs code-owner review.
+  policy-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - name: Trusted checker (base commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Pull request (data only, never executed)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Change-set policy
+        working-directory: trusted
+        run: python3 tools/policy_check.py --repo "$GITHUB_WORKSPACE/pr" --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
