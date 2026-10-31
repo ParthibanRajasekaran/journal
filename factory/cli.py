@@ -289,15 +289,20 @@ def cmd_handoffs(ctx: Context, args) -> int:
     return 0
 
 
-def cmd_policy_check(ctx: Context, args) -> int:
-    """Change-set check for CI: the diff between two refs, judged by the policy and approvals at the base."""
+def cmd_policy_check(args) -> int:
+    """Change-set check for CI: the diff between two refs, judged by the policy and approvals at the base.
+
+    The checker is the code that runs this function. CI must run it from a trusted checkout of the base commit,
+    and pass the pull request's checkout with --repo as data. A checker taken from the pull request would judge
+    itself. See docs/factory/proposals/ci-policy-check.md."""
     from factory import gitops as _g
     from factory.policy_gate import approved_prefixes, change_violations, changed_between, load_policy_at
 
-    base = _g.resolve(ctx.repo, args.base)
-    head = _g.resolve(ctx.repo, args.head)
-    changed = changed_between(ctx.repo, base, head)
-    violations = change_violations(changed, load_policy_at(ctx.repo, base), approved_prefixes(ctx.repo, base))
+    repo = Path(args.repo).resolve()
+    base = _g.resolve(repo, args.base)
+    head = _g.resolve(repo, args.head)
+    changed = changed_between(repo, base, head)
+    violations = change_violations(changed, load_policy_at(repo, base), approved_prefixes(repo, base))
     _print({"base": base[:12], "head": head[:12], "changed": len(changed), "violations": violations, "passed": not violations}, args.json)
     return 0 if not violations else 2
 
@@ -347,6 +352,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("provider", choices=[CLAUDE])
     p.add_argument("key", choices=["extra-usage-disabled"])
     p = sub.add_parser("policy-check", parents=[json_after], help="judge a diff between two refs against the policy at the base (for CI)")
+    p.add_argument("--repo", required=True, help="checkout holding the pull request, read as data")
     p.add_argument("--base", required=True)
     p.add_argument("--head", required=True)
     p = sub.add_parser("handoffs", parents=[json_after], help="list durable handoffs for a run")
@@ -363,7 +369,6 @@ COMMANDS = {
     "pause": cmd_pause,
     "resume": cmd_resume,
     "usage": cmd_usage,
-    "policy-check": cmd_policy_check,
     "providers": cmd_providers,
     "provider-toggle": cmd_provider_toggle,
     "attest": cmd_attest,
@@ -376,6 +381,9 @@ def main(argv: list[str]) -> int:
     try:
         if args.command == "doctor":
             return cmd_doctor(None, args)
+        if args.command == "policy-check":
+            # Needs no working-directory configuration, so CI can run it from a trusted checkout.
+            return cmd_policy_check(args)
         ctx = Context()
         return COMMANDS[args.command](ctx, args)
     except FactoryError as exc:

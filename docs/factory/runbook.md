@@ -22,6 +22,7 @@ Run from the repository root. Every command prints a clear message on failure.
 | `python3 -m factory pause RUN` | Asks a run to pause at its next dispatch or gate boundary. | No |
 | `python3 -m factory resume RUN [--live]` | Continues a paused or interrupted run. | Only with `--live` |
 | `python3 -m factory usage TICKET` | Shows cumulative committed spend for a ticket. | No |
+| `python3 -m factory policy-check --repo . --base REF --head REF` | Judges a diff against the policy and approvals at the base. For CI, run from a trusted checkout of the base, with the pull request passed as `--repo`. Exits 2 on any violation. | No |
 
 Exit codes: 0 for success or ready; 2 for a blocked run or a failed verification; 1 for an operator
 error such as an invalid ticket or missing live authorisation.

@@ -14,10 +14,11 @@ Replace the native bullet with:
 
 ## Change to section 2 (ID token validation)
 
-Keep the signature, `iss`, `aud`, `exp` and `email_verified` checks. Add the `azp` check. Replace the stored
-`nonce` check for native with: one-time use of each ID token, recorded server-side until its `exp`. The native
-flow does not get a nonce from the plugin. This is weaker than the web flow's stored-nonce check, and the
-amendment accepts that difference explicitly.
+Keep the signature, `iss`, `aud`, `exp` and `email_verified` checks. Add the `azp` check. Keep the nonce check
+for native, and make it server-bound: the backend issues a single-use nonce for each login attempt, stored as a
+hash with an expiry. The app passes it as `GoogleLoginOptions.nonce` (supported by the pinned plugin, 8.7.5).
+The backend requires the ID token's `nonce` claim to equal it, and consumes it atomically. One-time use of each
+ID token is a second check on top of this, not a substitute for it.
 
 ## Unchanged
 

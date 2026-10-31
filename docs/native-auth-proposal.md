@@ -16,7 +16,7 @@ not edit the ADR.
 | iOS backend validation: check that `aud` matches one of the app's client IDs, `iss` is accounts.google.com, `exp` has not passed, and the signature checks against Google's keys. Use an official library. | [Google Sign-In iOS backend auth](https://developers.google.com/identity/sign-in/ios/backend-auth) | 31 Oct 2026, search summary only |
 | On iOS, retrieving an ID token needs a second, server client ID, set with `GIDServerClientID`. The reversed client ID goes in `CFBundleURLSchemes`. | Same Google iOS page | 31 Oct 2026, search summary only |
 | Android Credential Manager: pass the **Web** client ID as the server client ID. Do not pass the Android client ID. The Android client needs only the exact package name and SHA-1. Digital Asset Links are not required. | `@capgo/capacitor-social-login` 8.7.5 README, "Android troubleshooting" section | 31 Oct 2026, npm readme |
-| The plugin returns `result.idToken`. Its README documents no nonce parameter. | Same README | 31 Oct 2026, npm readme |
+| The plugin returns `result.idToken` and accepts a nonce. `GoogleLoginOptions.nonce` is in its type definitions. Android calls `setNonce`. iOS passes the nonce to Google Sign-In, and a login with a nonce always signs in rather than restoring a previous token. | `@capgo/capacitor-social-login` 8.7.5 tarball: `dist/esm/definitions.d.ts`, `android/.../GoogleProvider.java`, `ios/.../GoogleProvider.swift` | 31 Oct 2026, read from the pinned package |
 | Plugin peer: `@capacitor/core >=8.0.0`. Capacitor 8 compatible. | npm peer dependencies | 31 Oct 2026 |
 | Emulator `Medium_Phone_API_36.0` uses `google_apis_playstore`, so Play services are present. | Local AVD and SDK config | 31 Oct 2026 |
 | Debug keystore SHA-1, public fingerprint only: `9B:63:12:33:3A:6D:BC:09:83:F9:2E:B8:DB:39:F4:6E:0A:A0:F3:46`. | `keytool -list` on `~/.android/debug.keystore` | 31 Oct 2026 |
@@ -47,6 +47,10 @@ No new credential is needed for the backend audience. Do not put any secret in t
 
 ## Backend changes
 
+Before each login, the app calls `POST /api/v1/auth/native/nonce` with `X-Journal-Request: 1`. The server generates
+a random nonce of 256 bits, stores `sha256(nonce)` with an expiry of five minutes and a null `used_at`, and returns
+the nonce. The app passes it as `GoogleLoginOptions.nonce` on every login, including iOS restored sign-ins.
+
 `POST /api/v1/auth/native/google` `{id_token}`, with `X-Journal-Request: 1`:
 
 1. Verify the signature against Google's JWKS. Accept only `iss` in {`accounts.google.com`,
@@ -54,24 +58,26 @@ No new credential is needed for the backend audience. Do not put any secret in t
 2. `aud` must equal the web client ID. If `azp` is present, it must equal the web client ID, or the iOS
    client ID for an iOS token. The spike confirms which values real tokens carry.
 3. `email_verified` must be true. The account key is `sub`.
-4. One-time use, atomically: insert `sha256(id_token)` with its `exp` into `native_id_token_uses`, with a unique
-   key, using `INSERT ... ON CONFLICT DO NOTHING RETURNING`. Zero rows returns 401. The table is pruned after
-   `exp`.
-5. Upsert the user, apply the adult-confirmation rule that already exists, call `service.start_session`, and
+4. Nonce binding, atomically: the token's `nonce` claim must be the value this login was issued. Look it up by
+   `sha256(nonce)` and consume it in one statement: `UPDATE native_nonces SET used_at = now() WHERE nonce_hash = $1
+   AND used_at IS NULL AND expires_at > now() RETURNING 1`. Zero rows returns 401. A nonce that was never issued,
+   has expired, or has already been used is refused.
+5. One-time token use, as a second check: insert `sha256(id_token)` with its `exp` into `native_id_token_uses`
+   with a unique key, using `INSERT ... ON CONFLICT DO NOTHING RETURNING`. Zero rows returns 401. Prune after `exp`.
+6. Upsert the user, apply the adult-confirmation rule that already exists, call `service.start_session`, and
    return `{access_token, refresh_token, expires_in}`.
 
 Also: `POST /native/refresh` and `POST /native/logout`, as in revision 2, and Bearer acceptance in
 `current_user_id`. The expected-account header from R2 applies to every native write.
 
-Migration: `native_id_token_uses(token_hash primary key, expires_at)`.
+Migration: `native_nonces(nonce_hash primary key, expires_at, used_at)` and `native_id_token_uses(token_hash primary key, expires_at)`.
 
 ## Deviations from ADR-004 (owner decision required)
 
 - ADR-004 §1 describes an authorization-code flow with PKCE and a claimed HTTPS redirect. The SDK flow returns
   an ID token directly, with no authorization code and no PKCE on our side.
-- ADR-004 §2 requires a `nonce` that matches a stored value. The plugin's README documents no nonce
-  parameter. In its place: `aud`/`azp` checks, a short token lifetime, and one-time use recorded on the server.
-  This is weaker than a stored nonce bound to the request. It is stated here, not hidden.
+- ADR-004 §2's nonce check is kept for native, bound to the server-issued nonce above. This is not a
+  deviation. The plugin supports the nonce, so nothing is weakened.
 - The Journal session (15-minute access token, rotating refresh token, family revocation) is unchanged.
 
 ## Storage
@@ -82,7 +88,9 @@ app-private SharedPreferences. It is not biometric-bound. ADR-004 §5 is not met
 ## Spike (before any production code)
 
 1. Android emulator, `google_apis_playstore`: the plugin with the Web client ID and the Android client for the
-   debug SHA-1. Check the ID token's `aud`, `azp`, `iss`, `exp` and `email_verified`.
+   debug SHA-1. Check the ID token's `aud`, `azp`, `iss`, `exp`, `email_verified` and `nonce`.
+   Nonce tests: a token with an unissued nonce, a token whose nonce was already used, and a token whose
+   nonce has expired are each refused.
 2. Backend: verify that token offline against the JWKS, and confirm the one-time-use rule rejects a replay.
 3. iOS: needs the `ios/` shell in `web/` (not yet done) and a signed build for a device. Simulator only is
    reported as partial.
