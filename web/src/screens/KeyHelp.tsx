@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { api, ApiError, Provider } from "../api";
 
 // Where each provider creates a key. We cannot fetch the key for the user: the provider only shows
@@ -33,8 +33,9 @@ export function KeyHelp({ onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const chosen = PROVIDERS.find((p) => p.id === provider) ?? null;
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  // The panel sits inside the Add meal form, so it must not be a form itself: nested forms send the
+  // Save click to the outer form and lose what the user typed.
+  async function save() {
     if (!chosen) return setError("Choose a provider first.");
     if (!agreed) return setError("Tick the box to confirm.");
     setSaving(true);
@@ -81,7 +82,7 @@ export function KeyHelp({ onSaved }: Props) {
       </div>
 
       {chosen && (
-        <form onSubmit={save} className="key-form">
+        <div className="key-form">
           <label htmlFor="key-paste">Paste your {chosen.label} key (starts with {chosen.prefix})</label>
           <input
             id="key-paste"
@@ -99,10 +100,15 @@ export function KeyHelp({ onSaved }: Props) {
             </span>
           </label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button type="submit" className="primary" disabled={saving || apiKey.trim().length === 0 || !agreed}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void save()}
+            disabled={saving || apiKey.trim().length === 0 || !agreed}
+          >
             {saving ? "Checking…" : "Save and estimate"}
           </button>
-        </form>
+        </div>
       )}
     </div>
   );
