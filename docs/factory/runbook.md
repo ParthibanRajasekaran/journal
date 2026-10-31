@@ -62,12 +62,59 @@ error such as an invalid ticket or missing live authorisation.
 migrations, ADRs, the PRD and the OpenAPI contract cannot be changed by a candidate. A candidate
 that edits them is blocked before review. Changing these files needs a reviewed commit by the owner.
 
+## Provider routes and the no-spend policy
+
+Factory development execution and Journal runtime AI are separate systems. The factory never reads
+Journal's stored API keys, and a stored key is not evidence of a free or subscription route.
+
+Default policy: no additional spend. `factory/providers.py` is the only place routes are decided.
+A dispatch is refused before any reservation or provider call unless every check passes:
+
+| Route | Eligible when | Status in this checkout |
+|---|---|---|
+| Claude Code subscription (`claude-code`) | Toggle on; CLI reports `authMethod: claude.ai` and `apiProvider: firstParty`; no API-billing variables are set; owner has attested extra usage is off | Refused until the owner runs `attest` (see below) |
+| Codex through ChatGPT sign-in (`codex`) | Not implemented | Refused: no verified adapter, CLI not installed |
+| Gemini free tier (`gemini`) | Not implemented | Refused: no verified adapter, CLI not installed |
+| Any API-key or purchased-credit route | Never | Always refused |
+
+Quota is always shown as `unknown`. The factory does not estimate it.
+
+Setup the owner must do (the factory will not do these):
+
+1. Confirm in the Claude account settings that extra usage is off. The CLI cannot report this.
+2. Record that attestation: `python3 -m factory attest claude-code extra-usage-disabled`.
+3. Enable the route if you want it: `python3 -m factory provider-toggle claude-code on` (already the default).
+4. Make sure no `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or similar variable is exported in the shell that runs the factory. The factory refuses and names the variable, never its value.
+5. Check with `python3 -m factory providers`.
+
+## Quota exhaustion and handoffs
+
+- A provider reporting a usage or rate limit pauses the run, rather than failing it. The handoff is
+  written first, to the ledger and to `.factory-local/runs/<run>/handoff-N.json`, with quota `unknown`.
+- `python3 -m factory handoffs RUN` lists them. A handoff closes when work resumes successfully.
+- `python3 -m factory resume RUN` checks eligibility first. If the route is still refused, the run
+  stays paused and records `resume-deferred`. If the route is eligible, it attempts the stage; a
+  renewed quota error pauses again with a new handoff, and nothing is repeated silently.
+- A crash between writing the handoff and pausing leaves the run in its working state with an open
+  handoff. Resume retries the stage. The failed attempt is not counted as work.
+
+## Workspace ownership
+
+Every `run`, `resume` and `verify` holds an OS file lock (`.factory-local/locks/<run>.lock`) for the
+whole operation. A second controller on the same run is refused with the holder's pid. The lock is
+released by the OS if the process dies, so it cannot go stale.
+
 ## Known limits (read before relying on results)
 
-- The Claude CLI adapter is not yet proven on a real candidate. Live dispatch needs the owner's
-  authorisation and a spend decision. See the bootstrap report.
+- No live Claude run has been verified under the policy. Claude dispatch is refused until the owner
+  makes the attestation above. Fake-CLI tests prove the paths; they do not prove the real CLI's
+  quota messages. The classifier matches "usage limit", "rate limit", "quota", "limit reached",
+  "too many requests" and HTTP 429 text, which should be checked against a real quota error.
+- Codex and Gemini have no adapter and no verified billing route. Both are refused.
 - `--max-turns` is not present in the installed Claude Code CLI (2.1.309). The adapter omits it.
 - `pause` does not kill an in-flight provider call; the configured timeout bounds it.
+- The CLI's `total_cost_usd` is a list-price estimate on the subscription route, not a bill. The USD
+  ledger is therefore an estimate guard, not a billing record.
 - Worktrees isolate files, not processes. They are not a security sandbox.
 - Hooks are not used. The controller and CI are the enforcement points.
 - There is no `release-plan` command yet. Release is not implemented.

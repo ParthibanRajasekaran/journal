@@ -17,5 +17,14 @@
   },
   "limits": {
     "max_repairs": 2
+  },
+  "providers": {
+    "_note": "Owner defaults for factory development routes. Local toggles in .factory-local/provider-toggles.json override these. Journal runtime AI is not configured here.",
+    "no_additional_spend": true,
+    "default_enabled": {
+      "claude-code": true,
+      "codex": false,
+      "gemini": false
+    }
   }
 }

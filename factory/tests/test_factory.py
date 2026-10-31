@@ -80,6 +80,16 @@ class ScriptedAdapter(DryRunAdapter):
         return super().review(workdir, ticket, diff, max_budget_usd)
 
 
+class AllowClaude:
+    """Test policy: treats the subscription route as eligible. Real eligibility is tested in
+    test_providers.py against a fake CLI, so these tests only cover argv and parsing."""
+
+    def evaluate(self, provider):
+        from factory.providers import Eligibility
+
+        return Eligibility(provider=provider, eligible=True, route="test-allow", reason="test policy")
+
+
 APPROVE_ALL = {"decision": "approve", "checked_acceptance": ["AC-1"], "findings": []}
 
 
@@ -425,7 +435,7 @@ class ClaudeAdapter(unittest.TestCase):
             "total_cost_usd": 0.12,
             "session_id": "s1",
         }
-        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format", "--max-budget-usd", "--tools", "--no-session-persistence"}, 60, False, runner=self.fake_runner(payload, calls))
+        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format", "--max-budget-usd", "--tools", "--no-session-persistence"}, 60, False, runner=self.fake_runner(payload, calls), policy=AllowClaude())
         result = adapter.review(Path("."), make_ticket(), "diff", max_budget_usd=0.5)
         argv = calls[0]
         self.assertIn("--max-budget-usd", argv)
@@ -439,7 +449,7 @@ class ClaudeAdapter(unittest.TestCase):
     def test_unsupported_flags_are_omitted_not_assumed(self):
         calls: list = []
         payload = {"subtype": "success", "is_error": False, "result": "{}", "total_cost_usd": 0.0}
-        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format"}, 60, True, runner=self.fake_runner(payload, calls))
+        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format"}, 60, True, runner=self.fake_runner(payload, calls), policy=AllowClaude())
         adapter.implement(Path("."), make_ticket(), None, max_budget_usd=0.5)
         self.assertNotIn("--max-budget-usd", calls[0])
         self.assertNotIn("--bare", calls[0])
@@ -447,7 +457,7 @@ class ClaudeAdapter(unittest.TestCase):
     def test_budget_exhaustion_is_reported_as_failure_with_its_cost(self):
         calls: list = []
         payload = {"subtype": "error_max_budget_usd", "is_error": True, "errors": ["Reached maximum budget"], "total_cost_usd": 0.32}
-        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format", "--max-budget-usd"}, 60, False, runner=self.fake_runner(payload, calls))
+        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format", "--max-budget-usd"}, 60, False, runner=self.fake_runner(payload, calls), policy=AllowClaude())
         result = adapter.implement(Path("."), make_ticket(), None, max_budget_usd=0.05)
         self.assertFalse(result.ok)
         self.assertAlmostEqual(result.cost_usd, 0.32)
@@ -457,7 +467,7 @@ class ClaudeAdapter(unittest.TestCase):
         def run(argv, **kwargs):
             return subprocess.CompletedProcess(argv, 1, stdout="Traceback...", stderr="")
 
-        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format"}, 60, False, runner=run)
+        adapter = ClaudeCliAdapter("claude", {"-p", "--output-format"}, 60, False, runner=run, policy=AllowClaude())
         result = adapter.review(Path("."), make_ticket(), "diff")
         self.assertFalse(result.ok)
 

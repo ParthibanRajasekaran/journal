@@ -16,6 +16,7 @@ from factory.common import FactoryError, now, read_json, sha256_text, write_json
 from factory.controller.decision import decide
 from factory.gates import run_gate
 from factory.ledger import BudgetExceeded, DuplicateDispatch, Ledger
+from factory.locks import WorkspaceLock
 from factory.scope import check_scope
 from factory.ticket import require_valid
 
@@ -26,6 +27,16 @@ class Blocked(Exception):
 
 class Paused(Exception):
     """An operator asked the run to pause. Takes effect at the next dispatch or gate boundary."""
+
+
+class QuotaExhausted(Exception):
+    """A provider reported its quota is used up. The run pauses with a handoff; remaining quota is unknown."""
+
+    def __init__(self, provider: str, stage: str, reason: str):
+        super().__init__(reason)
+        self.provider = provider
+        self.stage = stage
+        self.reason = reason
 
 
 ROUTE = ["orchestrator", "implementer", "independent-reviewer", "verifier"]
@@ -87,18 +98,28 @@ class Controller:
 
         branch = f"factory/{ticket['id']}/{run_id}"
         workdir = self.workdir(run_id)
-        gitops.add_worktree(self.repo, workdir, branch, start)
-        gitops.link_dependencies(self.repo, workdir, self.project.get("workspace_links", []))
-        self.ledger.event(run_id, "worktree", f"{branch} at {start[:12]}")
-        self._drive(run_id, ticket, workdir, base, manual=bool(candidate_ref))
+        with WorkspaceLock(self.factory_local / "locks", run_id):
+            gitops.add_worktree(self.repo, workdir, branch, start)
+            gitops.link_dependencies(self.repo, workdir, self.project.get("workspace_links", []))
+            self.ledger.event(run_id, "worktree", f"{branch} at {start[:12]}")
+            self._drive(run_id, ticket, workdir, base, manual=bool(candidate_ref))
         return run_id
 
     def resume(self, run_id: str) -> str:
+        with WorkspaceLock(self.factory_local / "locks", run_id):
+            return self._resume(run_id)
+
+    def _resume(self, run_id: str) -> str:
         run = self.ledger.get_run(run_id)
         if run["state"] in state.TERMINAL:
             return run["state"]
         if run["config_hash"] != self.config_hash:
             raise FactoryError("configuration or gate definitions changed since this run started; start a new run instead")
+        if run["state"] == state.PAUSED and self.ledger.open_handoffs(run_id):
+            eligibility = self.adapter.eligibility()
+            if not eligibility.eligible:
+                self.ledger.event(run_id, "resume-deferred", f"still not eligible: {eligibility.reason}")
+                return state.PAUSED
         ticket = self._load_ticket(run_id)
         reaped = self.ledger.orphan_open_reservations(run_id)
         if reaped:
@@ -116,6 +137,7 @@ class Controller:
         if run["candidate_sha"] and gitops.head(workdir) != run["candidate_sha"]:
             self._block(run_id, "workspace HEAD differs from the recorded candidate; evidence is stale")
             return state.BLOCKED
+        self.ledger.update_run(run_id, stop_reason=None)
         if run["state"] == state.PAUSED:
             resume_to = run["resume_state"] or state.PLANNED
             self._transition(run_id, resume_to)
@@ -131,6 +153,10 @@ class Controller:
 
     def verify(self, run_id: str) -> dict:
         """Re-runs the gates on the exact recorded candidate, without any model call."""
+        with WorkspaceLock(self.factory_local / "locks", run_id):
+            return self._verify(run_id)
+
+    def _verify(self, run_id: str) -> dict:
         run = self.ledger.get_run(run_id)
         if run["candidate_sha"] is None:
             raise FactoryError("run has no candidate commit to verify")
@@ -178,6 +204,10 @@ class Controller:
     def _dispatch(self, run_id: str, lineage: str, stage: str, role: str, call):
         """Reserve, record, call, settle. Each attempt is recorded once and never repeated silently."""
         self._check_pause(run_id)
+        eligibility = self.adapter.eligibility()
+        if not eligibility.eligible:
+            self.ledger.event(run_id, "refused", f"{eligibility.provider}: {eligibility.reason}")
+            raise Blocked(f"no-spend policy refused {stage}: {eligibility.reason}")
         cfg = self.config["budget"]
         attempt = self.ledger.next_attempt(run_id)
         try:
@@ -196,10 +226,21 @@ class Controller:
             self.ledger.finish_dispatch(run_id, stage, attempt, "failed")
             self.ledger.settle(reservation, None, "")
             raise
+        if result.extra.get("refused"):
+            self.ledger.finish_dispatch(run_id, stage, attempt, "failed")
+            self.ledger.settle(reservation, 0.0, "refused before any provider call")
+            raise Blocked(f"no-spend policy refused {stage}: {result.detail}")
+        if result.extra.get("quota"):
+            self.ledger.finish_dispatch(run_id, stage, attempt, "failed")
+            self.ledger.settle(reservation, result.cost_usd, result.basis or "quota exhausted")
+            raise QuotaExhausted(eligibility.provider, stage, result.detail)
         self.ledger.finish_dispatch(run_id, stage, attempt, "finished")
         basis = result.basis or getattr(self.adapter, "basis", "") or "unknown"
         spent = result.cost_usd if result.cost_usd is not None else (None if self.adapter.live else 0.0)
         self.ledger.settle(reservation, spent, basis)
+        if self.ledger.open_handoffs(run_id):
+            self.ledger.consume_handoffs(run_id)
+            self.ledger.event(run_id, "handoff-closed", "work continued after the provider became available")
         usage = self.ledger.usage(lineage)
         self.ledger.event(run_id, "dispatch", f"{stage} attempt {attempt}: {basis}; committed ${usage['committed_usd']:.2f}")
         warn_at = float(cfg["warn_fraction"]) * usage["cap_usd"]
@@ -214,8 +255,34 @@ class Controller:
             self._block(run_id, str(exc))
         except Paused:
             return
+        except QuotaExhausted as exc:
+            self._pause_for_quota(run_id, exc)
         except FactoryError as exc:
             self._block(run_id, f"controller error: {exc}")
+
+    def _pause_for_quota(self, run_id: str, exc: QuotaExhausted) -> None:
+        """Writes the handoff first, then pauses. A crash between the two leaves an open handoff and a
+        failed dispatch, which resume handles safely: the failed attempt is retried, nothing is duplicated."""
+        run = self.ledger.get_run(run_id)
+        handoff_id = self.ledger.write_handoff(run_id, exc.stage, exc.provider, exc.reason, run["candidate_sha"])
+        write_json(
+            self.run_dir(run_id) / f"handoff-{handoff_id}.json",
+            {
+                "run_id": run_id,
+                "stage": exc.stage,
+                "provider": exc.provider,
+                "reason": exc.reason,
+                "candidate_sha": run["candidate_sha"],
+                "workspace": str(self.workdir(run_id)),
+                "quota": {"state": "unknown", "detail": "remaining quota is not reported"},
+                "next_action": "resume the run after the provider's quota is restored, or once the owner reviews this handoff",
+                "created_at": now(),
+            },
+        )
+        current = run["state"]
+        self._transition(run_id, state.PAUSED)
+        self.ledger.update_run(run_id, stop_reason=f"paused: {exc.provider} quota exhausted during {exc.stage}; remaining quota unknown")
+        self.ledger.event(run_id, "handoff", f"handoff {handoff_id} written at {current}; run paused")
 
     def _loop(self, run_id: str, ticket: dict, workdir: Path, base: str, manual: bool) -> None:
         run = self.ledger.get_run(run_id)

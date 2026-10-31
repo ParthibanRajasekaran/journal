@@ -60,6 +60,17 @@ create table if not exists dispatches (
   finished_at real,
   unique (run_id, stage, attempt)
 );
+create table if not exists handoffs (
+  id integer primary key autoincrement,
+  run_id text not null references runs(id),
+  stage text not null,
+  provider text not null,
+  reason text not null,
+  candidate_sha text,
+  status text not null check (status in ('open', 'consumed')),
+  created_at real not null,
+  consumed_at real
+);
 create table if not exists events (
   id integer primary key autoincrement,
   run_id text not null,
@@ -260,6 +271,31 @@ class Ledger:
     def event(self, run_id: str, kind: str, detail: str) -> None:
         with self._tx() as c:
             c.execute("insert into events (run_id, kind, detail, ts) values (?, ?, ?, ?)", (run_id, kind, detail, now()))
+
+    # Handoffs: written before a run pauses for a provider, closed once work resumes ----------
+
+    def write_handoff(self, run_id: str, stage: str, provider: str, reason: str, candidate_sha: str | None) -> int:
+        with self._tx() as c:
+            cur = c.execute(
+                "insert into handoffs (run_id, stage, provider, reason, candidate_sha, status, created_at) "
+                "values (?, ?, ?, ?, ?, 'open', ?)",
+                (run_id, stage, provider, reason, candidate_sha, now()),
+            )
+            return int(cur.lastrowid)
+
+    def open_handoffs(self, run_id: str) -> list[dict]:
+        rows = self._conn.execute(
+            "select * from handoffs where run_id = ? and status = 'open' order by id", (run_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def consume_handoffs(self, run_id: str) -> int:
+        with self._tx() as c:
+            cur = c.execute(
+                "update handoffs set status = 'consumed', consumed_at = ? where run_id = ? and status = 'open'",
+                (now(), run_id),
+            )
+            return cur.rowcount
 
     def events(self, run_id: str) -> list[dict]:
         rows = self._conn.execute("select kind, detail, ts from events where run_id = ? order by id", (run_id,)).fetchall()

@@ -14,6 +14,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from factory.providers import CLAUDE, Eligibility, classify_claude_result, refuse
+
 
 @dataclass
 class AdapterResult:
@@ -48,9 +50,13 @@ def parse_review(text: str) -> dict | None:
 
 class DryRunAdapter:
     name = "dry-run"
+    provider = "dry-run"
     independent = False
     live = False
     basis = "dry-run: no provider call"
+
+    def eligibility(self) -> Eligibility:
+        return Eligibility(provider="dry-run", eligible=True, route="no-provider-call", reason="scripted; no model is called")
 
     def __init__(self, implement_script: list[dict] | None = None, review_script: list[dict] | None = None):
         self._implement = list(implement_script or [])
@@ -114,17 +120,25 @@ def reviewer_prompt(ticket: dict, diff: str) -> str:
 
 class ClaudeCliAdapter:
     name = "claude-cli"
+    provider = CLAUDE
     independent = True
     live = True
 
     ROLE_TOOLS = {"implementer": "Read,Edit,Write,Glob,Grep", "reviewer": "Read,Glob,Grep"}
 
-    def __init__(self, binary: str, flags: set[str], timeout: int, use_bare: bool, runner=subprocess.run):
+    def __init__(self, binary: str, flags: set[str], timeout: int, use_bare: bool, runner=subprocess.run, policy=None):
         self.binary = binary
         self.flags = flags
         self.timeout = timeout
         self.use_bare = use_bare
         self._run = runner
+        self.policy = policy
+
+    def eligibility(self) -> Eligibility:
+        """Checked before every dispatch, not only at start-up, because sign-in can change mid-run."""
+        if self.policy is None:
+            return refuse(CLAUDE, "no provider policy configured; refusing to dispatch")
+        return self.policy.evaluate(CLAUDE)
 
     @staticmethod
     def probe(binary: str) -> dict:
@@ -137,6 +151,9 @@ class ClaudeCliAdapter:
         return flag in self.flags
 
     def _invoke(self, role: str, prompt: str, cwd: Path, max_budget_usd: float) -> AdapterResult:
+        eligibility = self.eligibility()
+        if not eligibility.eligible:
+            return AdapterResult(ok=False, detail=f"refused by no-spend policy: {eligibility.reason}", extra={"refused": True})
         argv = [self.binary, "-p", prompt, "--output-format", "json"]
         if self.supports("--max-budget-usd"):
             argv += ["--max-budget-usd", f"{max_budget_usd:.2f}"]
@@ -156,14 +173,22 @@ class ClaudeCliAdapter:
             payload = json.loads(proc.stdout)
         except json.JSONDecodeError:
             return AdapterResult(ok=False, detail=f"{role} returned no JSON result (exit {proc.returncode})", cost_usd=None)
-        ok = payload.get("subtype") == "success" and not payload.get("is_error", False)
+        outcome = classify_claude_result(payload)
+        ok = outcome == "ok"
         cost = payload.get("total_cost_usd")
         return AdapterResult(
             ok=ok,
             text=str(payload.get("result", "")),
-            detail="" if ok else "; ".join(payload.get("errors", []) or [payload.get("subtype", "failed")]),
+            detail=(
+                "quota exhausted; remaining quota is unknown and the run will pause for a handoff"
+                if outcome == "quota"
+                else ""
+                if ok
+                else "; ".join(payload.get("errors", []) or [payload.get("subtype", "failed")])
+            ),
+            extra={"quota": outcome == "quota"},
             cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
-            basis="provider-reported (claude CLI total_cost_usd)" if cost is not None else "",
+            basis="estimate: list-price equivalent from claude CLI; subscription route, not billed per call" if cost is not None else "",
             payload=payload,
             session_id=payload.get("session_id"),
         )

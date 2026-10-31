@@ -15,6 +15,7 @@ from factory.adapters import ClaudeCliAdapter, DryRunAdapter
 from factory.common import FactoryError, read_json, sha256_text
 from factory.controller import Controller
 from factory.ledger import Ledger
+from factory.providers import CLAUDE, KNOWN_PROVIDERS, ProviderPolicy, quota_status
 from factory.ticket import load_ticket
 
 REQUIRED_CLAUDE_FLAGS = ["-p", "--output-format"]
@@ -51,7 +52,11 @@ class Context:
             set(info["flags"]),
             timeout=int(self.config["execution"]["timeout_seconds"]),
             use_bare=bool(self.config["execution"]["use_bare_mode"]),
+            policy=self.policy(),
         )
+
+    def policy(self) -> ProviderPolicy:
+        return ProviderPolicy(self.repo / ".factory-local", self.config, self.config["execution"]["claude_binary"])
 
     def controller(self, live: bool) -> Controller:
         return Controller(self.repo, self.ledger, self.adapter(live), self.config, self.project, self.config_hash)
@@ -184,6 +189,9 @@ def cmd_report(ctx: Context, args) -> int:
         lines.append(f"- {r['stage']} / {r['role']}: {r['status']}, reserved ${r['reserved_usd']:.2f}, basis: {r['spend_basis'] or 'pending'}")
     lines += ["", "## Events"]
     lines += [f"- {e['kind']}: {e['detail']}" for e in events]
+    lines += ["", "## Handoffs"]
+    handoff_rows = ctx.ledger._conn.execute("select * from handoffs where run_id = ? order by id", (args.run,)).fetchall()
+    lines += [f"- #{h['id']} {h['status']}: {h['stage']} via {h['provider']}: {h['reason']}" for h in handoff_rows] or ["- none"]
     lines += ["", "## Evidence files"]
     lines += [f"- {p.relative_to(ctx.repo)}" for p in evidence_files] or ["- none"]
     report = "\n".join(lines) + "\n"
@@ -206,6 +214,58 @@ def cmd_resume(ctx: Context, args) -> int:
     final = controller.resume(args.run)
     print(f"{args.run}: {final}")
     return 0 if final == "ready" else 2
+
+
+def cmd_providers(ctx: Context, args) -> int:
+    policy = ctx.policy()
+    rows = []
+    for name in KNOWN_PROVIDERS:
+        elig = policy.evaluate(name)
+        quota = quota_status(name)["state"]
+        rows.append(
+            {
+                "provider": name,
+                "enabled": policy.toggles().get(name, False),
+                "eligible": elig.eligible,
+                "route": elig.route,
+                "quota": quota,
+                "reason": elig.reason,
+            }
+        )
+    if args.json:
+        _print({"policy": "no additional spend", "providers": rows}, True)
+    else:
+        print("Policy: no additional spend. Unknown or paid routes are refused; quota is never estimated.")
+        for r in rows:
+            state_text = "ELIGIBLE" if r["eligible"] else "refused"
+            print(f"- {r['provider']}: {state_text} (enabled={r['enabled']}, quota={r['quota']})")
+            print(f"    {r['reason']}")
+    return 0
+
+
+def cmd_provider_toggle(ctx: Context, args) -> int:
+    policy = ctx.policy()
+    policy.set_toggle(args.provider, args.state == "on")
+    print(f"{args.provider}: {'enabled' if args.state == 'on' else 'disabled'} (local toggle; eligibility is still checked on every dispatch)")
+    return 0
+
+
+def cmd_attest(ctx: Context, args) -> int:
+    policy = ctx.policy()
+    policy.attest(args.provider, args.key)
+    print(f"recorded owner attestation {args.provider}/{args.key} in .factory-local/owner-attestations.json")
+    return 0
+
+
+def cmd_handoffs(ctx: Context, args) -> int:
+    rows = ctx.ledger._conn.execute("select * from handoffs where run_id = ? order by id", (args.run,)).fetchall()
+    if not rows:
+        print("no handoffs recorded for this run")
+        return 0
+    for r in rows:
+        print(f"#{r['id']} {r['status']}: stage={r['stage']} provider={r['provider']} candidate={(r['candidate_sha'] or 'none')[:12]}")
+        print(f"    reason: {r['reason']}")
+    return 0
 
 
 def cmd_usage(ctx: Context, args) -> int:
@@ -242,6 +302,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--live", action="store_true")
     p = sub.add_parser("usage", help="show cumulative spend for a ticket")
     p.add_argument("ticket")
+    sub.add_parser("providers", help="show which development routes are eligible, and why not")
+    p = sub.add_parser("provider-toggle", help="enable or disable a development route locally")
+    p.add_argument("provider", choices=list(KNOWN_PROVIDERS))
+    p.add_argument("state", choices=["on", "off"])
+    p = sub.add_parser("attest", help="record an owner attestation the CLI cannot verify itself")
+    p.add_argument("provider", choices=[CLAUDE])
+    p.add_argument("key", choices=["extra-usage-disabled"])
+    p = sub.add_parser("handoffs", help="list durable handoffs for a run")
+    p.add_argument("run")
     return parser
 
 
@@ -254,6 +323,10 @@ COMMANDS = {
     "pause": cmd_pause,
     "resume": cmd_resume,
     "usage": cmd_usage,
+    "providers": cmd_providers,
+    "provider-toggle": cmd_provider_toggle,
+    "attest": cmd_attest,
+    "handoffs": cmd_handoffs,
 }
 
 
