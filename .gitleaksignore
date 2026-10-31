@@ -13,3 +13,6 @@ fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-k
 
 # Same reviewed storage-key false positive, in the web-only outbox candidate commit (line 11).
 40508e263ea347a731f13b93f522fa296c80b89e:web/src/offline.ts:generic-api-key:11
+
+# Same reviewed storage-key false positive, in the outbox candidate commit 8a4d74f (line 11).
+8a4d74f6a3943fbfcf439338f83411c5e5b50e17:web/src/offline.ts:generic-api-key:11

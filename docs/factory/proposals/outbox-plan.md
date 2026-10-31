@@ -73,7 +73,9 @@ them has run.
 1. Record the new base: `<M1>` is the `main` SHA after the bootstrap merge.
 2. Confirm the authorisation is on `<M1>`. Run `python3 tools/policy_check.py --repo . --base <M1> --head <M1>` and
    check the admission result for the ticket's paths.
-3. Recreate the candidate on the new base. Create a worktree from `<M1>`, check out the same 13 paths from the source
+3. Recreate the candidate on the new base. The candidate must also carry the reviewed `.gitleaksignore` entry for its
+   quarantine-key false positive. Without it, the secret scan on the candidate branch fails. That entry is part of the
+   candidate's own reviewed diff, not a change made to `main`. Create a worktree from `<M1>`, check out the same 13 paths from the source
    commit used for `8a4d74f`, and commit. Record the new SHA as `<C2>`. Do not reuse `8a4d74f`: its parent is `b5f296f`.
 4. Update the ticket's `base_commit` to `<M1>`, and its `allowed_paths` to the 13 paths. Make this a separate commit, on
    its own branch from `<M1>`.
