@@ -4,3 +4,6 @@ ba1cd2244d62175a357f12fde17109326128ef5e:docs/adr/0001-backend-and-api.md:generi
 
 # Test-only fixed encryption key in backend/tests/conftest.py. It protects nothing.
 fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-key:13
+
+# Browser storage key name for the quarantined legacy queue (web/src/offline.ts line 10). Not a credential.
+7b9bddd84cd8622a406da354dfaf48461677d625:web/src/offline.ts:generic-api-key:10
