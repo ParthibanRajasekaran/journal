@@ -149,3 +149,31 @@ describe("request ownership guard", () => {
   });
 });
 
+
+describe("expected account on creates", () => {
+  const meal = {
+    client_id: "3f1c2a9e-5b7d-4e8a-9c01-2d6f7a8b9c10",
+    meal_type: "lunch" as const,
+    eaten_at: "2026-10-29T12:00:00.000Z",
+    name: "Soup",
+    calories: 200,
+    protein_g: 10,
+    carbs_g: 20,
+    fat_g: 5,
+    source: "manual" as const,
+  };
+
+  it("names the account the write was made for", async () => {
+    const spy = mockFetch(() => new Response(JSON.stringify({ id: "meal_1" }), { status: 201 }));
+    await api.createMeal(meal, undefined, "usr_abc");
+    const [, init] = spy.mock.calls[0];
+    expect(init.headers["X-Journal-Expected-Account"]).toBe("usr_abc");
+  });
+
+  it("omits the header when no account is named", async () => {
+    const spy = mockFetch(() => new Response(JSON.stringify({ id: "meal_1" }), { status: 201 }));
+    await api.createMeal(meal);
+    const [, init] = spy.mock.calls[0];
+    expect(init.headers["X-Journal-Expected-Account"]).toBeUndefined();
+  });
+});

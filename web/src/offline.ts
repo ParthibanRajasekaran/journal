@@ -1,7 +1,7 @@
 // Meals that could not be sent because the connection dropped. Every entry belongs to the account
 // that created it, and is only ever sent while that same account owns the session. Each meal keeps
 // its client_id, so the server answers a repeat with the meal it already has and never saves it twice.
-import { api, ApiError, NewMeal } from "./api";
+import { api, ApiError, NewMeal, OTHER_ACCOUNT } from "./api";
 import { sessionOwner } from "./session";
 
 export const OUTBOX_KEY = "journal.outbox.v2";
@@ -30,7 +30,8 @@ export interface OutboxEntry {
 export type CommitResult = { ok: true } | { ok: false; error: "storage-unavailable" | "outbox-unsafe" };
 // `guard` returns false once the session belongs to someone else. The sender must check it before
 // any resend, so a meal cannot be replayed under another account.
-export type SendMeal = (meal: NewMeal, guard: () => boolean) => Promise<unknown>;
+// `expected` is the account the meal was queued for. The server refuses the write if the session is another account.
+export type SendMeal = (meal: NewMeal, guard: () => boolean, expected: string) => Promise<unknown>;
 
 function isEntry(value: unknown): value is OutboxEntry {
   if (!value || typeof value !== "object") return false;
@@ -200,6 +201,8 @@ export function retryBlocked(owner: string): CommitResult {
 function classify(err: unknown): { kind: "pause" } | { kind: "retry" } | { kind: "block"; reason: string } {
   if (err instanceof ApiError) {
     if (err.status === 401 || err.status === 403) return { kind: "pause" };
+    // Another account owns the session. The meal stays queued for its own account; it is not invalid.
+    if (err.status === 409 && err.message === OTHER_ACCOUNT) return { kind: "pause" };
     if (err.status === 0 || err.status === 408 || err.status >= 500) return { kind: "retry" };
     if (err.status === 409 && err.message === "Retry the request.") return { kind: "retry" };
     return { kind: "block", reason: err.message };
@@ -232,7 +235,7 @@ async function sendPending(owner: string, send: SendMeal): Promise<number> {
     // Check before every send: the session may have changed while an earlier request was in flight.
     if (!stillOwner()) break;
     try {
-      await send(entry.meal, stillOwner);
+      await send(entry.meal, stillOwner, owner);
     } catch (err) {
       const verdict = classify(err);
       if (verdict.kind === "pause") break;
@@ -261,7 +264,7 @@ const inFlight = new Map<string, { again: boolean; promise: Promise<number> }>()
 
 // Sends the signed-in account's waiting meals. Does nothing when no account is signed in, and stops
 // as soon as the session belongs to a different account.
-export function flushQueue(owner: string | null, send: SendMeal = (m, guard) => api.createMeal(m, guard)): Promise<number> {
+export function flushQueue(owner: string | null, send: SendMeal = (m, guard, expected) => api.createMeal(m, guard, expected)): Promise<number> {
   if (!owner) return Promise.resolve(0);
   const running = inFlight.get(owner);
   if (running) {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, NewMeal } from "./api";
+import { ApiError, NewMeal, OTHER_ACCOUNT } from "./api";
 import {
   MAX_ATTEMPTS,
   OUTBOX_KEY,
@@ -433,5 +433,27 @@ describe("unsafe outbox refuses every write", () => {
     const quarantined = JSON.parse(localStorage.getItem(QUARANTINE_KEY) ?? "[]") as string[];
     expect(quarantined.join("\n")).toContain("unsynced-data");
     expect(readQueue(A).map((e) => e.meal.client_id)).toEqual(["a1", "a2"]);
+  });
+});
+
+// R2 on the client: the server is the authority, but the queue must keep A's meals and say what happened.
+describe("cross-account refusal from the server", () => {
+  it("pauses on the server's account refusal and keeps the meal queued for its own account", async () => {
+    enqueue(A, meal("a1"));
+    const send = vi.fn().mockRejectedValue(new ApiError(409, OTHER_ACCOUNT));
+
+    expect(await flushAs(A, send)).toBe(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    const [entry] = readQueue(A);
+    expect(entry.state).toBe("pending");
+    expect(entry.attempts).toBe(0);
+  });
+
+  it("names the account each queued write was made for", async () => {
+    enqueue(A, meal("a1"));
+    const send = vi.fn().mockResolvedValue({});
+
+    await flushAs(A, send);
+    expect(send.mock.calls[0][2]).toBe(A);
   });
 });

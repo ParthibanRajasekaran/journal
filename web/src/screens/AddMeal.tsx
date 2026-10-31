@@ -199,7 +199,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
       source: sourceFor(),
     };
     try {
-      await api.createMeal(meal);
+      await api.createMeal(meal, undefined, owner);
       writeDraft(owner, null);
       onDone();
     } catch (err) {
