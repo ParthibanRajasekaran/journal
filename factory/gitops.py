@@ -70,10 +70,22 @@ def commit_all(workdir: Path, message: str) -> str | None:
     return head(workdir)
 
 
-def dirty_entries(workdir: Path) -> list[str]:
-    """Every tracked change and every untracked (not ignored) file, as `git status` reports them."""
+def dirty_entries(workdir: Path, workspace_links: tuple[str, ...] = ()) -> list[str]:
+    """Every tracked change and every untracked (not ignored) file, as `git status` reports them.
+
+    Dependency links that the factory creates (see link_dependencies) are exempt, but only when they are
+    actually symlinks at the declared path. A .gitignore pattern ending in '/' matches directories, not
+    symlinks, so without this exemption every worktree that needs dependencies would look dirty."""
     out = git(workdir, "status", "--porcelain", "--untracked-files=all")
-    return [line for line in out.splitlines() if line.strip()]
+    entries = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        path = entry_path(line)
+        if line.startswith("??") and path in workspace_links and (Path(workdir) / path).is_symlink():
+            continue
+        entries.append(line)
+    return entries
 
 
 def entry_path(line: str) -> str:
@@ -94,10 +106,10 @@ def relevant_dirty(workdir: Path, patterns: list[str]) -> list[str]:
     return relevant
 
 
-def snapshot(workdir: Path) -> dict:
+def snapshot(workdir: Path, workspace_links: tuple[str, ...] = ()) -> dict:
     """Identity of a worktree's committed and uncommitted state. Compared before and after gates and review."""
     return {
         "head": head(workdir),
         "tree": git(workdir, "rev-parse", "HEAD^{tree}").strip(),
-        "dirty": dirty_entries(workdir),
+        "dirty": dirty_entries(workdir, workspace_links),
     }

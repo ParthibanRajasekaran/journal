@@ -51,6 +51,7 @@ class Controller:
         self.project = project
         self.config_hash = config_hash
         self.factory_local = self.repo / ".factory-local"
+        self.links = tuple(project.get("workspace_links", []))
 
     # Paths ------------------------------------------------------------------------------------
 
@@ -148,7 +149,7 @@ class Controller:
         if run["candidate_sha"] and gitops.head(workdir) != run["candidate_sha"]:
             self._block(run_id, "workspace HEAD differs from the recorded candidate; evidence is stale")
             return state.BLOCKED
-        if gitops.dirty_entries(workdir):
+        if gitops.dirty_entries(workdir, self.links):
             self._block(run_id, "workspace has uncommitted or untracked changes; it was modified outside the factory")
             return state.BLOCKED
         self.ledger.update_run(run_id, stop_reason=None)
@@ -180,7 +181,7 @@ class Controller:
             return {"run_id": run_id, "passed": False, "reason": "stale: workspace HEAD is not the candidate"}
         if run["config_hash"] != self.config_hash:
             return {"run_id": run_id, "passed": False, "reason": "stale: gate configuration changed"}
-        dirty = gitops.dirty_entries(workdir)
+        dirty = gitops.dirty_entries(workdir, self.links)
         if dirty:
             return {"run_id": run_id, "passed": False, "reason": "stale: worktree has uncommitted or untracked changes", "dirty": dirty}
         ticket = self._load_ticket(run_id)
@@ -351,7 +352,7 @@ class Controller:
             raise Blocked("; ".join(reasons))
 
     def _verify_candidate(self, run_id: str, ticket: dict, workdir: Path, base: str, lineage: str) -> dict:
-        before = gitops.snapshot(workdir)
+        before = gitops.snapshot(workdir, self.links)
         candidate = before["head"]
         changed = gitops.changed_paths(workdir, base)
         violations = check_scope(
@@ -384,7 +385,7 @@ class Controller:
                 "checked_acceptance": (result.payload or {}).get("checked_acceptance", []) if result.ok else [],
                 "findings": (result.payload or {}).get("findings", []) if result.ok else [],
             }
-        after = gitops.snapshot(workdir)
+        after = gitops.snapshot(workdir, self.links)
         if after != before:
             # Something changed the tree while gates or the reviewer ran. These results describe a state that is not the commit.
             violations.append(f"candidate changed during verification (head {before['head'][:12]} -> {after['head'][:12]}, dirty {len(after['dirty'])})")

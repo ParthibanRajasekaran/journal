@@ -117,6 +117,31 @@ class DirtyWorktrees(EvidenceIntegrity):
         self.assertIn("uncommitted", result["reason"])
 
 
+class WorkspaceLinks(EvidenceIntegrity):
+    """The factory links installed dependencies into a worktree. That link must not count as dirt, but
+    nothing else at that path may."""
+
+    def test_declared_dependency_symlink_is_not_dirty(self):
+        from factory.gitops import dirty_entries
+
+        workdir = self.tmp / "wt"
+        (self.tmp / "deps").mkdir()
+        self._git("worktree", "add", "-q", "-b", "wt-links", str(workdir), "HEAD")
+        (workdir / "web").mkdir(exist_ok=True)
+        (workdir / "web" / "node_modules").symlink_to(self.tmp / "deps", target_is_directory=True)
+        self.assertEqual(dirty_entries(workdir, ("web/node_modules",)), [])
+        self.assertTrue(dirty_entries(workdir))  # without the declaration it is reported
+
+    def test_a_real_directory_at_the_link_path_is_still_dirty(self):
+        from factory.gitops import dirty_entries
+
+        workdir = self.tmp / "wt2"
+        self._git("worktree", "add", "-q", "-b", "wt-links-2", str(workdir), "HEAD")
+        (workdir / "web" / "node_modules").mkdir(parents=True)
+        (workdir / "web" / "node_modules" / "x.js").write_text("x\n")
+        self.assertTrue(dirty_entries(workdir, ("web/node_modules",)))
+
+
 class CommitIdentity(EvidenceIntegrity):
     def test_verified_commit_is_the_one_that_was_tested(self):
         candidate = self.commit_change("app/feature.txt", "good\n")
