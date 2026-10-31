@@ -1,0 +1,11 @@
+{
+  "_status": "pending-owner-approval",
+  "_note": "Factory ticket paths that policy/agents/change_policy.rego does not allow an agent to write. Each entry is an explicit, reviewable exception. Removing an entry, or widening one, requires an owner-approved change to policy/ (human review only). The policy test fails on any ticket path that is neither covered by the policy roots nor listed here, and on any listed exception that no ticket uses.",
+  "exceptions": [
+    {
+      "prefix": "web/",
+      "reason": "Canonical web client. The policy's allowed roots (src, backend, tests, docs) predate the move of the client to web/.",
+      "used_by_tickets": ["JRN-OUTBOX-001"]
+    }
+  ]
+}

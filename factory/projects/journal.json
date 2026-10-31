@@ -2,7 +2,9 @@
   "project": "journal",
   "_protected": "Gate commands and protected paths. A candidate run cannot change them; changes need owner review.",
   "default_gate_timeout_s": 600,
-  "workspace_links": ["web/node_modules"],
+  "workspace_links": [
+    "web/node_modules"
+  ],
   "protected_paths": [
     "factory/**",
     "policy/**",
@@ -18,11 +20,43 @@
     "docs/adr/**",
     "docs/prd.md",
     "docs/openapi.yaml",
-    ".env*"
+    ".env",
+    ".env*",
+    "evals/**",
+    "**/auth/**",
+    "**/authz/**",
+    "src/services/biometricAuth.ts",
+    "**/.env*"
   ],
   "gates": {
-    "web-typecheck": {"cwd": "web", "argv": ["npm", "run", "--silent", "typecheck"], "timeout": 300},
-    "web-unit": {"cwd": "web", "argv": ["npx", "vitest", "run"], "timeout": 300},
-    "web-build": {"cwd": "web", "argv": ["npm", "run", "--silent", "build"], "timeout": 600}
+    "web-typecheck": {
+      "cwd": "web",
+      "argv": [
+        "npm",
+        "run",
+        "--silent",
+        "typecheck"
+      ],
+      "timeout": 300
+    },
+    "web-unit": {
+      "cwd": "web",
+      "argv": [
+        "npx",
+        "vitest",
+        "run"
+      ],
+      "timeout": 300
+    },
+    "web-build": {
+      "cwd": "web",
+      "argv": [
+        "npm",
+        "run",
+        "--silent",
+        "build"
+      ],
+      "timeout": 600
+    }
   }
 }

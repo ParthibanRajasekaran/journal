@@ -68,3 +68,36 @@ def commit_all(workdir: Path, message: str) -> str | None:
         return None
     git(workdir, *IDENTITY, "commit", "-q", "-m", message)
     return head(workdir)
+
+
+def dirty_entries(workdir: Path) -> list[str]:
+    """Every tracked change and every untracked (not ignored) file, as `git status` reports them."""
+    out = git(workdir, "status", "--porcelain", "--untracked-files=all")
+    return [line for line in out.splitlines() if line.strip()]
+
+
+def entry_path(line: str) -> str:
+    return line[3:].strip().strip('"')
+
+
+def relevant_dirty(workdir: Path, patterns: list[str]) -> list[str]:
+    """Uncommitted changes that a candidate would depend on: any tracked change, or an untracked file
+    under one of the given patterns. Unrelated untracked notes are ignored."""
+    from factory.scope import matches
+
+    relevant = []
+    for line in dirty_entries(workdir):
+        path = entry_path(line)
+        tracked = not line.startswith("??")
+        if tracked or matches(path, patterns):
+            relevant.append(line)
+    return relevant
+
+
+def snapshot(workdir: Path) -> dict:
+    """Identity of a worktree's committed and uncommitted state. Compared before and after gates and review."""
+    return {
+        "head": head(workdir),
+        "tree": git(workdir, "rev-parse", "HEAD^{tree}").strip(),
+        "dirty": dirty_entries(workdir),
+    }

@@ -72,44 +72,65 @@ def _print(data, as_json: bool) -> None:
             print(f"{key}: {value}")
 
 
+def _run_safe(argv: list[str], timeout: int = 30) -> tuple[int, str] | None:
+    """Runs a probe command. A missing executable, a permission error or a timeout returns None, never raises."""
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+
+
 def cmd_doctor(ctx: Context | None, args) -> int:
-    checks = []
+    """Reports what is available. Every probe tolerates a missing tool, so the doctor always finishes."""
+    checks: list[dict] = []
 
     def check(name: str, ok: bool, detail: str) -> None:
         checks.append({"check": name, "status": "available" if ok else "missing", "detail": detail})
 
-    def version_of(binary: str, arg: str = "--version") -> str | None:
+    def version_of(binary: str) -> str | None:
         if shutil.which(binary) is None:
             return None
-        proc = subprocess.run([binary, arg], capture_output=True, text=True, timeout=30)
-        return (proc.stdout or proc.stderr).strip().splitlines()[0] if (proc.stdout or proc.stderr).strip() else "installed"
+        result = _run_safe([binary, "--version"])
+        if result is None:
+            return "found on PATH but did not answer --version"
+        first = result[1].strip().splitlines()
+        return first[0] if first else "installed"
 
     for name in ["git", "uv", "node", "npm", "opa", "gitleaks", "gradle", "java", "docker"]:
         v = version_of(name)
-        check(name, v is not None, v or "not on PATH")
+        check(name, v is not None and not v.startswith("found on PATH but"), v or "not on PATH")
 
     claude = shutil.which("claude")
-    if claude:
-        info = ClaudeCliAdapter.probe(claude)
-        missing = [f for f in REQUIRED_CLAUDE_FLAGS if f not in info["flags"]]
-        check("claude-cli", not missing, f"{info['version']}; " + ("required flags present" if not missing else f"missing {missing}"))
-    else:
+    if claude is None:
         check("claude-cli", False, "not on PATH")
+    else:
+        try:
+            info = ClaudeCliAdapter.probe(claude)
+            missing = [f for f in REQUIRED_CLAUDE_FLAGS if f not in info["flags"]]
+            check("claude-cli", not missing, f"{info['version']}; " + ("required flags present" if not missing else f"missing {missing}"))
+        except (OSError, subprocess.SubprocessError):
+            check("claude-cli", False, "found on PATH but did not answer the probe")
 
-    pg = subprocess.run(["pg_isready", "-h", "127.0.0.1", "-p", "5433"], capture_output=True, text=True)
-    check("postgresql-5433", pg.returncode == 0, "accepting connections" if pg.returncode == 0 else "not reachable (needed for backend tests)")
+    pg = _run_safe(["pg_isready", "-h", "127.0.0.1", "-p", "5433"], timeout=10)
+    if pg is None:
+        check("postgresql-5433", False, "pg_isready not on PATH; cannot check (needed for backend tests)")
+    else:
+        check("postgresql-5433", pg[0] == 0, "accepting connections" if pg[0] == 0 else "not reachable (needed for backend tests)")
 
-    xcode = subprocess.run(["xcode-select", "-p"], capture_output=True, text=True).stdout.strip()
+    xs = _run_safe(["xcode-select", "-p"], timeout=10)
+    xcode = xs[1].strip() if xs and xs[0] == 0 else ""
     full_xcode = xcode.endswith("Xcode.app/Contents/Developer")
-    check("xcode-full-app", full_xcode, xcode or "not configured" if not full_xcode else xcode)
+    check("xcode-full-app", full_xcode, xcode or "xcode-select not configured or not on PATH")
 
     sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or ""
     adb = Path(sdk) / "platform-tools" / "adb" if sdk else None
     check("android-sdk", bool(adb and adb.exists()), sdk or "ANDROID_HOME unset")
     if adb and adb.exists():
-        devices = subprocess.run([str(adb), "devices"], capture_output=True, text=True).stdout.splitlines()[1:]
-        connected = [d for d in devices if d.strip().endswith("device")]
-        check("android-device", bool(connected), f"{len(connected)} authorised device(s) connected")
+        result = _run_safe([str(adb), "devices"])
+        lines = result[1].splitlines()[1:] if result else []
+        connected = [d for d in lines if d.strip().endswith("device")]
+        check("android-device", bool(connected), f"{len(connected)} authorised device(s) connected" if result else "adb did not answer")
     else:
         check("android-device", False, "adb not available")
 
@@ -281,35 +302,38 @@ def cmd_usage(ctx: Context, args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory", description="Journal AI software factory")
     parser.add_argument("--json", action="store_true", help="machine-readable output where supported")
+    # Also accepted after the subcommand, as the runbook shows. SUPPRESS keeps the top-level value.
+    json_after = argparse.ArgumentParser(add_help=False)
+    json_after.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="machine-readable output where supported")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("doctor", help="report capabilities and missing prerequisites")
-    sub.add_parser("validate", help="check config, gates and tickets")
-    p = sub.add_parser("plan", help="route and budget a ticket without dispatch")
+    sub.add_parser("doctor", parents=[json_after], help="report capabilities and missing prerequisites")
+    sub.add_parser("validate", parents=[json_after], help="check config, gates and tickets")
+    p = sub.add_parser("plan", parents=[json_after], help="route and budget a ticket without dispatch")
     p.add_argument("ticket", type=Path)
-    p = sub.add_parser("run", help="run a ticket (dry-run unless --live)")
+    p = sub.add_parser("run", parents=[json_after], help="run a ticket (dry-run unless --live)")
     p.add_argument("ticket", type=Path)
     p.add_argument("--live", action="store_true", help=f"dispatch to the Claude CLI (also needs {LIVE_FLAG_ENV}=1)")
     p.add_argument("--candidate", help="verify an existing commit instead of dispatching an implementer")
-    p = sub.add_parser("verify", help="re-run gates on the recorded candidate")
+    p = sub.add_parser("verify", parents=[json_after], help="re-run gates on the recorded candidate")
     p.add_argument("run")
-    p = sub.add_parser("report", help="write and print a run report")
+    p = sub.add_parser("report", parents=[json_after], help="write and print a run report")
     p.add_argument("run")
-    p = sub.add_parser("pause", help="ask a run to pause at its next boundary")
+    p = sub.add_parser("pause", parents=[json_after], help="ask a run to pause at its next boundary")
     p.add_argument("run")
-    p = sub.add_parser("resume", help="resume a paused or interrupted run")
+    p = sub.add_parser("resume", parents=[json_after], help="resume a paused or interrupted run")
     p.add_argument("run")
     p.add_argument("--live", action="store_true")
-    p = sub.add_parser("usage", help="show cumulative spend for a ticket")
+    p = sub.add_parser("usage", parents=[json_after], help="show cumulative spend for a ticket")
     p.add_argument("ticket")
-    sub.add_parser("providers", help="show which development routes are eligible, and why not")
-    p = sub.add_parser("provider-toggle", help="enable or disable a development route locally")
+    sub.add_parser("providers", parents=[json_after], help="show which development routes are eligible, and why not")
+    p = sub.add_parser("provider-toggle", parents=[json_after], help="enable or disable a development route locally")
     p.add_argument("provider", choices=list(KNOWN_PROVIDERS))
     p.add_argument("state", choices=["on", "off"])
-    p = sub.add_parser("attest", help="record an owner attestation the CLI cannot verify itself")
+    p = sub.add_parser("attest", parents=[json_after], help="record an owner attestation the CLI cannot verify itself")
     p.add_argument("provider", choices=[CLAUDE])
     p.add_argument("key", choices=["extra-usage-disabled"])
-    p = sub.add_parser("handoffs", help="list durable handoffs for a run")
+    p = sub.add_parser("handoffs", parents=[json_after], help="list durable handoffs for a run")
     p.add_argument("run")
     return parser
 

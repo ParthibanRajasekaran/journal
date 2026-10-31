@@ -53,4 +53,4 @@ web:
 # Factory controller tests. Stdlib only; no model calls, no network writes.
 .PHONY: factory
 factory:
-	python3 -m unittest factory.tests.test_factory factory.tests.test_providers
+	python3 -m unittest discover -s factory/tests -t . -p "test_*.py"

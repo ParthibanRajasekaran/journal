@@ -88,6 +88,17 @@ class Controller:
         require_valid(ticket, self.project, self.config["budget"]["max_ticket_usd"], self.config["limits"]["max_repairs"])
         base = gitops.resolve(self.repo, ticket.get("base_commit") or "HEAD")
         start = gitops.resolve(self.repo, candidate_ref) if candidate_ref else base
+        if candidate_ref:
+            # A candidate is a commit. Uncommitted corrections in the primary checkout would not be
+            # part of it, so verifying them would not verify the commit.
+            patterns = list(ticket["allowed_paths"]) + list(ticket.get("protected_paths", [])) + list(self.project.get("protected_paths", []))
+            relevant = gitops.relevant_dirty(self.repo, patterns)
+            if relevant:
+                raise FactoryError(
+                    "primary checkout has uncommitted changes the candidate would not contain: "
+                    + "; ".join(entry.strip() for entry in relevant)
+                    + ". Commit or stash them, then verify the commit."
+                )
         run_id = f"run-{uuid.uuid4().hex[:12]}"
         lineage = self.ledger.lineage_for(ticket["id"], float(ticket["budget_usd"]))
         mode = "manual-candidate" if candidate_ref else self.adapter.name
@@ -137,6 +148,9 @@ class Controller:
         if run["candidate_sha"] and gitops.head(workdir) != run["candidate_sha"]:
             self._block(run_id, "workspace HEAD differs from the recorded candidate; evidence is stale")
             return state.BLOCKED
+        if gitops.dirty_entries(workdir):
+            self._block(run_id, "workspace has uncommitted or untracked changes; it was modified outside the factory")
+            return state.BLOCKED
         self.ledger.update_run(run_id, stop_reason=None)
         if run["state"] == state.PAUSED:
             resume_to = run["resume_state"] or state.PLANNED
@@ -166,6 +180,9 @@ class Controller:
             return {"run_id": run_id, "passed": False, "reason": "stale: workspace HEAD is not the candidate"}
         if run["config_hash"] != self.config_hash:
             return {"run_id": run_id, "passed": False, "reason": "stale: gate configuration changed"}
+        dirty = gitops.dirty_entries(workdir)
+        if dirty:
+            return {"run_id": run_id, "passed": False, "reason": "stale: worktree has uncommitted or untracked changes", "dirty": dirty}
         ticket = self._load_ticket(run_id)
         results = [self._gate(workdir, gid) for gid in ticket["verification"]]
         passed = all(r["passed"] for r in results)
@@ -334,7 +351,8 @@ class Controller:
             raise Blocked("; ".join(reasons))
 
     def _verify_candidate(self, run_id: str, ticket: dict, workdir: Path, base: str, lineage: str) -> dict:
-        candidate = gitops.head(workdir)
+        before = gitops.snapshot(workdir)
+        candidate = before["head"]
         changed = gitops.changed_paths(workdir, base)
         violations = check_scope(
             changed,
@@ -343,6 +361,9 @@ class Controller:
         )
         if not changed:
             violations.append("the candidate changes no files")
+        if before["dirty"]:
+            # Evidence is for a commit. Any uncommitted or untracked file means the tested tree is not that commit.
+            violations.append("worktree is not clean: " + "; ".join(entry.strip() for entry in before["dirty"]))
         gates: list[dict] = []
         review: dict | None = None
         if not violations:
@@ -363,10 +384,15 @@ class Controller:
                 "checked_acceptance": (result.payload or {}).get("checked_acceptance", []) if result.ok else [],
                 "findings": (result.payload or {}).get("findings", []) if result.ok else [],
             }
+        after = gitops.snapshot(workdir)
+        if after != before:
+            # Something changed the tree while gates or the reviewer ran. These results describe a state that is not the commit.
+            violations.append(f"candidate changed during verification (head {before['head'][:12]} -> {after['head'][:12]}, dirty {len(after['dirty'])})")
         return {
             "run_id": run_id,
             "ticket_id": ticket["id"],
             "candidate_sha": candidate,
+            "worktree": {"before": before, "after": after, "mutated": after != before},
             "base_sha": base,
             "config_hash": self.config_hash,
             "ticket_hash": sha256_text(repr(sorted(ticket.items()))),
