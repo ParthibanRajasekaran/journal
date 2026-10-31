@@ -25,7 +25,9 @@ export interface OutboxEntry {
   reason?: string;
 }
 
-export type CommitResult = { ok: true } | { ok: false; error: "storage-unavailable" };
+// "outbox-unsafe": a record could not be copied to a verified quarantine, so the stored outbox must not be
+// rewritten. Rewriting would drop that record.
+export type CommitResult = { ok: true } | { ok: false; error: "storage-unavailable" | "outbox-unsafe" };
 // `guard` returns false once the session belongs to someone else. The sender must check it before
 // any resend, so a meal cannot be replayed under another account.
 export type SendMeal = (meal: NewMeal, guard: () => boolean) => Promise<unknown>;
@@ -76,37 +78,49 @@ function quarantine(items: string[]): boolean {
   }
 }
 
-// Reads every entry. Anything that is not a valid entry is moved to quarantine rather than dropped.
-// The original text is replaced only after the quarantine copy is verified, so a failed quarantine
-// leaves every byte where it was and the next read tries again.
-function readAll(): OutboxEntry[] {
+interface OutboxRead {
+  entries: OutboxEntry[];
+  // False when the stored text holds records that are not yet safely copied. Nothing may be
+  // written, and nothing may be sent, until the copy is verified.
+  safe: boolean;
+}
+
+// Reads every entry. Anything that is not a valid entry is copied to quarantine first. The stored text
+// is replaced only after that copy reads back. If the copy cannot be verified, the stored text is left
+// exactly as it was and the read is marked unsafe.
+function readOutbox(): OutboxRead {
   const store = storage();
-  if (!store) return [];
+  if (!store) return { entries: [], safe: false };
   let raw: string | null;
   try {
     raw = store.getItem(OUTBOX_KEY);
   } catch {
-    return [];
+    return { entries: [], safe: false };
   }
-  if (raw === null) return [];
+  if (raw === null) return { entries: [], safe: true };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    quarantine([raw]);
-    return [];
+    return { entries: [], safe: quarantine([raw]) };
   }
-  if (!Array.isArray(parsed)) {
-    quarantine([raw]);
-    return [];
-  }
+  if (!Array.isArray(parsed)) return { entries: [], safe: quarantine([raw]) };
   const valid = parsed.filter(isEntry);
   const malformed = parsed.filter((item) => !isEntry(item));
-  if (malformed.length > 0) {
-    const copied = quarantine(malformed.map((item) => JSON.stringify(item)));
-    if (copied) commit(valid);
+  if (malformed.length === 0) return { entries: valid, safe: true };
+  if (!quarantine(malformed.map((item) => JSON.stringify(item)))) {
+    return { entries: valid, safe: false };
   }
-  return valid;
+  // The malformed records are now verified in quarantine, so the stored text may drop them.
+  const rewritten = commit(valid);
+  return { entries: valid, safe: rewritten.ok };
+}
+
+// Every outbox mutation goes through here. It refuses while the stored outbox is unsafe.
+function mutate(change: (entries: OutboxEntry[]) => OutboxEntry[]): CommitResult {
+  const read = readOutbox();
+  if (!read.safe) return { ok: false, error: "outbox-unsafe" };
+  return commit(change(read.entries));
 }
 
 // Writes the whole outbox and reads it back. A write that the browser accepted but did not keep
@@ -157,23 +171,25 @@ export function quarantineLegacy(): number {
 // Entries for one account, pending or blocked.
 export function readQueue(owner: string | null): OutboxEntry[] {
   if (!owner) return [];
-  return readAll().filter((e) => e.owner === owner);
+  return readOutbox().entries.filter((e) => e.owner === owner);
 }
 
 export function enqueue(owner: string, meal: NewMeal): CommitResult {
-  const others = readAll().filter((e) => !(e.owner === owner && e.meal.client_id === meal.client_id));
-  return commit([...others, { owner, meal, state: "pending", attempts: 0 }]);
+  return mutate((entries) => [
+    ...entries.filter((e) => !(e.owner === owner && e.meal.client_id === meal.client_id)),
+    { owner, meal, state: "pending", attempts: 0 },
+  ]);
 }
 
 // Removes one account's entries. Used when the account is deleted, so queued meals cannot come back.
 export function discardOwner(owner: string): CommitResult {
-  return commit(readAll().filter((e) => e.owner !== owner));
+  return mutate((entries) => entries.filter((e) => e.owner !== owner));
 }
 
 // Puts blocked entries back in line, for example after the user has fixed the problem.
 export function retryBlocked(owner: string): CommitResult {
-  return commit(
-    readAll().map((e) => (e.owner === owner && e.state === "blocked" ? { ...e, state: "pending", attempts: 0, reason: undefined } : e)),
+  return mutate((entries) =>
+    entries.map((e) => (e.owner === owner && e.state === "blocked" ? { ...e, state: "pending", attempts: 0, reason: undefined } : e)),
   );
 }
 
@@ -192,20 +208,24 @@ function classify(err: unknown): { kind: "pause" } | { kind: "retry" } | { kind:
 }
 
 function update(owner: string, clientId: string, change: (e: OutboxEntry) => OutboxEntry | null): void {
-  const next: OutboxEntry[] = [];
-  for (const e of readAll()) {
-    if (e.owner === owner && e.meal.client_id === clientId) {
-      const replaced = change(e);
-      if (replaced) next.push(replaced);
-    } else {
-      next.push(e);
+  mutate((entries) => {
+    const next: OutboxEntry[] = [];
+    for (const e of entries) {
+      if (e.owner === owner && e.meal.client_id === clientId) {
+        const replaced = change(e);
+        if (replaced) next.push(replaced);
+      } else {
+        next.push(e);
+      }
     }
-  }
-  commit(next);
+    return next;
+  });
 }
 
 async function sendPending(owner: string, send: SendMeal): Promise<number> {
   const stillOwner = () => sessionOwner() === owner;
+  // Sending removes entries afterwards. If the outbox is unsafe, that removal could drop a record, so nothing is sent.
+  if (!readOutbox().safe) return 0;
   let sent = 0;
   for (const entry of readQueue(owner)) {
     if (entry.state !== "pending") continue;

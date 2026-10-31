@@ -384,3 +384,54 @@ describe("malformed outbox entries", () => {
     expect(localStorage.getItem(QUARANTINE_KEY)).toContain("{not json");
   });
 });
+
+// R1: when a malformed entry (or unreadable outbox) cannot be copied to a verified quarantine, the
+// outbox is unsafe to rewrite. Every mutation must refuse, and nothing may be sent.
+describe("unsafe outbox refuses every write", () => {
+  const valid = { owner: A, meal: meal("a1"), state: "pending", attempts: 0 };
+  const malformed = { owner: "", meal: { client_id: "unsynced-data" } };
+
+  function unsafeOutbox(): string {
+    const raw = JSON.stringify([valid, malformed]);
+    localStorage.setItem(OUTBOX_KEY, raw);
+    localStorage.setItem(QUARANTINE_KEY, "{damaged");
+    return raw;
+  }
+
+  it("refuses enqueue and keeps the malformed record", () => {
+    const raw = unsafeOutbox();
+    expect(enqueue(A, meal("a2"))).toEqual({ ok: false, error: "outbox-unsafe" });
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe(raw);
+  });
+
+  it("refuses retry, discard and status updates", () => {
+    const raw = unsafeOutbox();
+    expect(retryBlocked(A)).toEqual({ ok: false, error: "outbox-unsafe" });
+    expect(discardOwner(A)).toEqual({ ok: false, error: "outbox-unsafe" });
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe(raw);
+  });
+
+  it("sends nothing while the outbox is unsafe", async () => {
+    const raw = unsafeOutbox();
+    const server = fakeServer();
+    expect(await flushAs(A, server.send)).toBe(0);
+    expect(server.send).not.toHaveBeenCalled();
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe(raw);
+  });
+
+  it("refuses enqueue over invalid JSON when the copy cannot be verified", () => {
+    localStorage.setItem(OUTBOX_KEY, "{not json");
+    localStorage.setItem(QUARANTINE_KEY, "{damaged");
+    expect(enqueue(A, meal("a2"))).toEqual({ ok: false, error: "outbox-unsafe" });
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe("{not json");
+  });
+
+  it("allows writes again once the damaged copy is verified, and keeps the malformed record", () => {
+    unsafeOutbox();
+    localStorage.removeItem(QUARANTINE_KEY);
+    expect(enqueue(A, meal("a2"))).toEqual({ ok: true });
+    const quarantined = JSON.parse(localStorage.getItem(QUARANTINE_KEY) ?? "[]") as string[];
+    expect(quarantined.join("\n")).toContain("unsynced-data");
+    expect(readQueue(A).map((e) => e.meal.client_id)).toEqual(["a1", "a2"]);
+  });
+});
