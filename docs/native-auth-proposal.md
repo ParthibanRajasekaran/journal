@@ -1,130 +1,99 @@
-# Native sign-in for Android and iOS: proposal for review (revision 2)
+# Native sign-in for Android and iOS: proposal, revision 3 (for review)
 
-Status: proposal. Not implemented. The change touches paths the agent policy marks as human-review-only
-(`**/auth/**`, `backend/app/routes/auth.py`). Authoritative source for the decisions: ADR-004. Revision 2
-replaces revision 1, which used a custom URL scheme. ADR-004 requires a claimed HTTPS link, so that
-design is withdrawn.
+Status: proposal, not implemented and not approved. Revision 3 replaces revision 2. It withdraws the
+browser-redirect design, because the Capacitor Browser plugin has no supported way to return an OAuth redirect
+to the app on iOS. It also changes ADR-004's native flow, which needs an explicit owner amendment
+(`docs/factory/proposals/adr-004-amendment.md`). The agent policy protects `docs/adr/**`, so this proposal does
+not edit the ADR.
 
-## Verified facts (read-only, 31 October 2026)
+## Verified facts, with sources
 
-| Check | Result |
-|---|---|
-| `GET https://journal.getrendercheck.com/api/v1/health` | 200 `{"status":"ok"}` |
-| `GET https://journal.getrendercheck.com/api/v1/health/ready` | 200 `{"status":"ready"}` |
-| `GET https://journal.getrendercheck.com/api/v1/meals`, no session | 401 |
-| `GET https://journal.getrendercheck.com/api/v1/auth/google/start` | 302 to Google, PKCE S256, redirect to the production callback |
-| Migration head in this checkout | `f4b8c2a6d1e9` |
-| Backend suite on this branch | 249 passed |
+| Claim | Source | Checked |
+|---|---|---|
+| Capacitor Browser uses SFSafariViewController on iOS. The docs give no guidance on capturing an OAuth redirect into the app. | [Capacitor Browser API docs](https://capacitorjs.com/docs/apis/browser) | 31 Oct 2026, WebFetch |
+| The Browser plugin cannot return a redirect to the app on iOS. Native ASWebAuthenticationSession is a feature request. | [Capacitor feature request thread](https://outsystems.canny.io/capacitor-feature-requests/p/support-sso-flow-in-browser-plugin) | 31 Oct 2026, search summary only |
+| Google's OAuth policy: create a separate OAuth client per platform (web, Android, iOS). Do not use a web client for a native app. | [Google OAuth 2.0 policies](https://developers.google.com/identity/protocols/oauth2/policies) | 31 Oct 2026, search summary only |
+| iOS backend validation: check that `aud` matches one of the app's client IDs, `iss` is accounts.google.com, `exp` has not passed, and the signature checks against Google's keys. Use an official library. | [Google Sign-In iOS backend auth](https://developers.google.com/identity/sign-in/ios/backend-auth) | 31 Oct 2026, search summary only |
+| On iOS, retrieving an ID token needs a second, server client ID, set with `GIDServerClientID`. The reversed client ID goes in `CFBundleURLSchemes`. | Same Google iOS page | 31 Oct 2026, search summary only |
+| Android Credential Manager: pass the **Web** client ID as the server client ID. Do not pass the Android client ID. The Android client needs only the exact package name and SHA-1. Digital Asset Links are not required. | `@capgo/capacitor-social-login` 8.7.5 README, "Android troubleshooting" section | 31 Oct 2026, npm readme |
+| The plugin returns `result.idToken`. Its README documents no nonce parameter. | Same README | 31 Oct 2026, npm readme |
+| Plugin peer: `@capacitor/core >=8.0.0`. Capacitor 8 compatible. | npm peer dependencies | 31 Oct 2026 |
+| Emulator `Medium_Phone_API_36.0` uses `google_apis_playstore`, so Play services are present. | Local AVD and SDK config | 31 Oct 2026 |
+| Debug keystore SHA-1, public fingerprint only: `9B:63:12:33:3A:6D:BC:09:83:F9:2E:B8:DB:39:F4:6E:0A:A0:F3:46`. | `keytool -list` on `~/.android/debug.keystore` | 31 Oct 2026 |
+| Production backend: health 200, Google sign-in start configured with the web client ID. | Read-only probes, earlier checkpoint | 31 Oct 2026 |
 
-The deployed commit is not visible from outside, so whether production runs this code is unverified.
+The search summaries are secondary. Before any implementation, the spike must confirm the iOS `aud` behaviour
+on a real token, using the official pages.
 
-## What blocks the packaged app today
+## Decision: use the platform SDK, not the browser redirect
 
-1. The API sends no CORS grant (ADR-004 and `backend/app/auth/deps.py`). The app's origin
-   `https://localhost` is cross-site to the API, so `fetch` fails.
-2. Session cookies are `SameSite=Lax` (access) and `SameSite=Strict` (refresh). Cross-site requests from
-   the app never send them.
-3. Loading the hosted app in the WebView would run Google sign-in in the WebView. ADR-004 forbids this,
-   and RFC 8252 requires the system browser.
+Google's guidance for Android and iOS is to use the platform sign-in SDK, which puts the account chooser in
+system UI. The app gets an ID token, and the backend verifies it. This avoids the browser redirect, so the
+iOS return problem and the App Link requirement both go away.
 
-## Decision required: which ADR-004 variant
+The Capacitor integration is `@capgo/capacitor-social-login` 8.7.5, pinned exactly. It is a maintained plugin
+and it targets Capacitor 8. This is a choice, not a fact that the plugin is safe. The spike must check it.
 
-Both variants meet ADR-004 (system browser, PKCE, claimed HTTPS redirect, no embedded webview). They differ
-in who holds the Google code exchange.
+## Exact configuration (owner creates these, once)
 
-### Variant A: native public client (recommended, follows the ADR-004 sequence)
+| Item | Value | Where |
+|---|---|---|
+| Web OAuth client (existing, production) | the client ID already used by `JOURNAL_GOOGLE_CLIENT_ID` | Google Cloud, Credentials. Used as `webClientId` and `iOSServerClientId`. This is the backend audience. |
+| iOS OAuth client (new) | bundle ID `com.journal.nutrition` (from `capacitor.config`) | Google Cloud. Gives `iOSClientId` and the reversed client ID for `CFBundleURLSchemes`. |
+| Android OAuth client (new) | package `com.journal.nutrition`, SHA-1 of the signing key | Google Cloud. Console only, never passed to the app. Use the debug SHA-1 above for a personal test build, and register the release SHA-1 separately when it exists. |
+| OAuth consent screen | Testing mode, with each test account added under Test users | Google Cloud |
 
-- Google: a second OAuth client of Android and iOS type (or a web client with the app-link redirect URI
-  registered). It has no client secret. Its redirect is the claimed HTTPS link
-  `https://journal.getrendercheck.com/app/auth/callback`. This is a Google console change owned by a person.
-- App: generates PKCE verifier, S256 challenge and nonce. It stores them in secure storage before opening
-  the system browser. The browser returns `code` and `state` through the App Link.
-- App calls `POST /api/v1/auth/native/callback` with `{code, state, verifier, nonce}`.
-- Backend: exchanges the code with Google using the native client ID and the verifier, validates the ID
-  token per ADR-004 §2 (JWKS, `iss`, `aud`, `exp`, `nonce`, `email_verified`), upserts the user by `sub`,
-  and calls `service.start_session`. It returns `{access_token, refresh_token, expires_in}`. The access
-  token is a JWT with `sid`, valid 15 minutes.
-- No exchange code is needed, because the tokens travel in the response to the same client over TLS.
-- Single-flight refresh, rotation and reuse-revokes-family are unchanged from ADR-004 §3.
+No new credential is needed for the backend audience. Do not put any secret in the app bundle.
 
-### Variant B: backend-mediated (keeps the single existing Google web client)
+## Backend changes
 
-- Google redirects to the existing backend callback. The backend then redirects the browser to the
-  claimed HTTPS link `https://journal.getrendercheck.com/app/auth/return?code=...`.
-- The code is a one-time exchange code. The app redeems it at `POST /api/v1/auth/native/token`.
-- Atomic consumption (required in this variant):
-  1. Store only `sha256(code)`, with `user_id`, the expected `challenge`, `expires_at` (now + 120 s) and
-     `used_at` (null).
-  2. On redeem, first burn the code in one statement:
-     `UPDATE native_exchange_codes SET used_at = now() WHERE code_hash = $1 AND used_at IS NULL AND expires_at > now() RETURNING user_id, challenge`.
-     Postgres row locking makes this a single winner. Zero rows returns 401.
-  3. Compare `S256(verifier)` with the returned `challenge`. A mismatch returns 401 and the code stays
-     burned. A leaked code cannot be retried.
-  4. Only then call `service.start_session` and commit. Both happen in one transaction.
-- Test: 20 concurrent redeems of one code produce exactly one 200 and 19 failures.
-- Migration: `native_exchange_codes(code_hash primary key, user_id, challenge, expires_at, used_at)`.
-- This variant keeps the web flow unchanged. It is less direct than A, because the backend handles the
-  code exchange with Google's client secret, and the native app depends on the backend's redirect.
+`POST /api/v1/auth/native/google` `{id_token}`, with `X-Journal-Request: 1`:
 
-Recommendation: variant A. It matches ADR-004's sequence exactly, avoids a second credential path, and
-needs no exchange-code table. Variant B is the fallback if a second Google client is unwanted.
+1. Verify the signature against Google's JWKS. Accept only `iss` in {`accounts.google.com`,
+   `https://accounts.google.com`}. Reject if `exp` has passed.
+2. `aud` must equal the web client ID. If `azp` is present, it must equal the web client ID, or the iOS
+   client ID for an iOS token. The spike confirms which values real tokens carry.
+3. `email_verified` must be true. The account key is `sub`.
+4. One-time use, atomically: insert `sha256(id_token)` with its `exp` into `native_id_token_uses`, with a unique
+   key, using `INSERT ... ON CONFLICT DO NOTHING RETURNING`. Zero rows returns 401. The table is pruned after
+   `exp`.
+5. Upsert the user, apply the adult-confirmation rule that already exists, call `service.start_session`, and
+   return `{access_token, refresh_token, expires_in}`.
 
-## Backend changes (both variants)
+Also: `POST /native/refresh` and `POST /native/logout`, as in revision 2, and Bearer acceptance in
+`current_user_id`. The expected-account header from R2 applies to every native write.
 
-- `current_user_id` accepts `Authorization: Bearer <access>` when the access cookie is absent. Writes still
-  require `X-Journal-Request: 1`. The CSRF rule stands, since a bearer token is not sent ambiently.
-- `POST /api/v1/auth/native/refresh` `{refresh_token}` calls `service.rotate`, and returns a new pair.
-- `POST /api/v1/auth/native/logout` `{refresh_token}` calls `service.revoke`.
-- Sign-out everywhere (ADR-004 §4) is a separate endpoint, not part of this change.
+Migration: `native_id_token_uses(token_hash primary key, expires_at)`.
 
-## Client changes
+## Deviations from ADR-004 (owner decision required)
 
-- `@capacitor/browser` opens the system browser (Custom Tabs on Android, ASWebAuthenticationSession on iOS).
-- `@capacitor/app` receives the App Link through `appUrlOpen`.
-- Android: an intent filter with `android:autoVerify="true"` for the host, and
-  `/.well-known/assetlinks.json` served from production with the signing certificate fingerprint. The debug
-  APK signing fingerprint is a different value, so App Links verify only for the matching key.
-- iOS: an associated domain and `/.well-known/apple-app-site-association`. This needs a signed build.
-- Caddy must serve both `/.well-known/` files. That is an ops change to `docker/Caddyfile`, not made here.
+- ADR-004 §1 describes an authorization-code flow with PKCE and a claimed HTTPS redirect. The SDK flow returns
+  an ID token directly, with no authorization code and no PKCE on our side.
+- ADR-004 §2 requires a `nonce` that matches a stored value. The plugin's README documents no nonce
+  parameter. In its place: `aud`/`azp` checks, a short token lifetime, and one-time use recorded on the server.
+  This is weaker than a stored nonce bound to the request. It is stated here, not hidden.
+- The Journal session (15-minute access token, rotating refresh token, family revocation) is unchanged.
 
-## Secure storage: chosen plugin and its limits
+## Storage
 
-Choice: `@aparajita/capacitor-secure-storage` version 8.0.1, the Capacitor 8 release (peer `node >=20`).
-It stores data in the iOS keychain and, on Android, encrypts with AES-GCM under an Android Keystore key,
-then writes to app-private SharedPreferences. Both platforms are documented by the package.
+`@aparajita/capacitor-secure-storage` 8.0.1, as in revision 2. OS keychain on iOS; Android Keystore AES-GCM with
+app-private SharedPreferences. It is not biometric-bound. ADR-004 §5 is not met by this plugin alone.
 
-Limits, to be stated to the owner:
+## Spike (before any production code)
 
-- This is OS-protected storage. It is not biometric-bound. ADR-004 §5 (non-exportable keys, biometric
-  prompt on each unlock, Secure Enclave or StrongBox) is not met by this plugin alone. It is a separate,
-  later step.
-- Keys are not hardware-attested by this plugin. Accept that, or name a Keystore plugin instead.
-- iOS keychain data survives app deletion. Android data does not.
+1. Android emulator, `google_apis_playstore`: the plugin with the Web client ID and the Android client for the
+   debug SHA-1. Check the ID token's `aud`, `azp`, `iss`, `exp` and `email_verified`.
+2. Backend: verify that token offline against the JWKS, and confirm the one-time-use rule rejects a replay.
+3. iOS: needs the `ios/` shell in `web/` (not yet done) and a signed build for a device. Simulator only is
+   reported as partial.
 
-## Permissions
-
-`USE_BIOMETRIC` is unused. Remove it in the native change. Do not claim biometric unlock until the
-ADR-004 §5 work exists.
+Google sign-in needs a person with their own account. The agent does not enter credentials.
 
 ## Required decisions
 
-1. Choose variant A or B.
-2. For variant A, create the native Google OAuth client and register the App Link redirect (owner action).
-3. Approve the backend change, or name a person to make it.
-4. Confirm production runs this code.
-5. Approve the storage plugin, or name a different one, knowing the limits above.
-6. Decide the repository policy for `web/`, `android/`, `ios/` and `factory/`. See
-   `docs/factory/policy-reconciliation.md`.
-
-## Verification plan (once approved)
-
-- Backend tests: code reuse, expired code, wrong verifier (variant B), concurrent redeem (variant B),
-  refresh reuse revoking the family, logout revoking the family, a bearer request with no cookie, and a
-  bearer write with no CSRF header.
-- Android emulator: install the debug APK, start sign-in, confirm the browser opens and the App Link
-  returns to the app (verify the App Link on the emulator with `adb shell pm get-app-links`), confirm the
-  session survives force-stop and relaunch, and confirm sign-out.
-- Physical Android device: the same steps. Emulator results are reported separately.
-- iOS: simulator run after the `ios/` relocation, then a signed device build.
-- Google sign-in needs a person with their own account. It cannot be automated, and the agent does not
-  enter credentials.
+1. Approve the SDK approach and the ADR-004 amendment (`docs/factory/proposals/adr-004-amendment.md`), or keep the
+   redirect design and accept its iOS gap.
+2. Create the iOS and Android OAuth clients with the exact values above, when you choose to run the spike.
+3. Approve the plugin, or name another maintained one.
+4. Approve moving `ios/` under `web/`.
+5. Decide the policy for `web/**`, per `docs/factory/policy-reconciliation.md`.
