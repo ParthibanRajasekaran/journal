@@ -54,7 +54,11 @@
   "verification": [
     "web-typecheck",
     "web-unit",
-    "web-build"
+    "web-build",
+    "backend-tests",
+    "backend-lint",
+    "backend-format",
+    "backend-types"
   ],
   "budget_usd": 1.0,
   "max_repairs": 2,

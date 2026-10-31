@@ -15,54 +15,63 @@ commit (`working-directory: trusted`), it cannot be replaced by the pull request
 in `factory/tests/test_policy_check_trust.py` cover this: the trusted checker rejects the pull request, and the
 pull request's checker passes it when it judges itself. Both pass.
 
-## 2. Workflow replacement (the remaining gap)
+## 2. Workflow replacement, and the ownership protections that stop it
 
 A pull request runs the workflow file from the pull request. It can keep the job name `policy-check` and replace
-its command with `exit 0`. A status check named `policy-check` then passes. **Requiring the status name alone is
-insufficient.** The checker from section 1 protects only a job that still runs it.
+its command with `exit 0`, so requiring the status name alone is insufficient. Enforcement needs something a
+pull request cannot edit, and a required reviewer who is not the author.
 
-So the policy check has to be enforced by something a pull request cannot edit. Three options, with what each depends on:
+### 2a. The reviewer arrangement (required, and owner-chosen)
 
-| Option | What it enforces | What it depends on | Verified here |
-|---|---|---|---|
-| A. Trusted required workflow (a workflow defined outside the repository, required by policy) | Runs a fixed job the pull request cannot change | GitHub organisation or enterprise rulesets. Availability for a personal account is **unverified** | No |
-| B. Code-owner review of workflow and checker changes, enforced by branch protection | A pull request that edits `.github/workflows/**` or `factory/**` cannot merge without an owner's approval | Branch protection with "require review from code owners", CODEOWNERS on the base branch, "dismiss stale approvals" on new pushes, and "restrict who can push" | No (see section 3) |
-| C. A merge check run from the base branch by a person | A human compares the workflow diff with the base before merging | Discipline, not automation | Not enforcement |
+GitHub's protected-branch documentation says approvals must come from reviewers with write permission. It does
+not say that the pull request author's own approval counts, so this proposal never relies on it. A repository
+with one collaborator therefore cannot satisfy a required review from someone other than the author. Choose one:
 
-Recommended: B, with A if available. Both need owner settings. Neither is a code change.
+- **A. Second reviewer account (recommended).** Add a second GitHub account with write access. List it as the code
+  owner for the protected paths below. Its approval is the required review. The agent does not approve, merge or
+  request a review on its own behalf.
+- **B. Single-owner repository.** No required reviewer can exist. Required reviews and code-owner review are then
+  documentation only, not enforcement. This is stated as a residual risk, not a control.
 
-### Option B, exact settings to request
+### 2b. Protected paths and their owner (CODEOWNERS)
 
-For the default branch `main`:
+GitHub's documentation says pull requests use the CODEOWNERS file from the base branch, and that GitHub checks the
+`.github/`, root and `docs/` locations, using the first file it finds. The file is therefore placed at
+`.github/CODEOWNERS` on `main`. A pull request cannot change the file that routes its own review. A change to the
+file takes effect only after it is merged.
 
-1. Require a pull request before merging, with **1 approval**.
-2. **Require review from code owners.**
-3. **Dismiss stale pull request approvals when new commits are pushed.** A new push after approval must be reviewed again.
-4. Require the status check `policy-check` and the existing `ci` check. This is necessary, not sufficient.
-5. Restrict who can push to `main`. Include administrators, so the owner cannot bypass the rule casually.
-6. Disallow force pushes and deletions.
-
-CODEOWNERS on the base branch (proposal, not created):
+Proposed content (placeholder `@REVIEWER` is the second account from option A):
 
 ```
-# Human review required for any change to workflow, checker, policy or approvals.
-/.github/            @ParthibanRajasekaran
-/factory/            @ParthibanRajasekaran
-/policy/             @ParthibanRajasekaran
-/docs/factory/       @ParthibanRajasekaran
-/docs/adr/           @ParthibanRajasekaran
+# Protected paths. Changes need review from a code owner other than the author.
+/.github/           @REVIEWER
+/factory/           @REVIEWER
+/tools/             @REVIEWER
+/policy/            @REVIEWER
+/docs/factory/      @REVIEWER
+/docs/adr/          @REVIEWER
 ```
 
-**Unverified:** whether GitHub reads CODEOWNERS from the pull request or from the base branch when deciding required
-reviewers. Confirm this in a throwaway test repository before relying on it. If the pull request's file is used, a
-pull request could remove its own owner rule. The base-branch behaviour is what this document assumes.
+`tools/` is listed because `tools/policy_check.py` and `tools/tests/` are the trusted checker. A pull request that
+edits them would otherwise change the judge.
 
-### Stale approvals and bypass
+### 2c. Branch protection settings to request on `main` (owner settings)
 
-- A reviewer approves commit X. A new commit Y that edits a workflow must not inherit that approval. Setting 3
-  handles this, and it is **unverified** until tested with the owner's settings.
-- Bypass restrictions: administrator inclusion (setting 5). The owner account is also the only collaborator, so
-  this is a single-person control. It stops accidents, not a deliberate act by the owner.
+1. Require a pull request before merging, with **one approval**.
+2. **Require review from code owners.** GitHub documents that a change to a code owner's path needs that owner's approval.
+3. **Dismiss stale pull request approvals when new commits are pushed.** GitHub documents that a changed diff dismisses the approval and the merge waits for a new one.
+4. **Do not allow bypassing the above settings.** GitHub documents that, without this setting, admins are not bound by the rule.
+5. Require the `ci` check. Requiring `policy-check` only after it has run from a trusted base checkout (section 4).
+6. Restrict pushes to `main`, and disallow force pushes and deletions.
+
+Read-only state, checked 31 October 2026 with `gh api`: no protection on `main` (404), no rulesets, no CODEOWNERS file,
+one collaborator. Nothing is enforced today.
+
+### 2d. Bypass and stale approvals
+
+- Stale approvals are handled by setting 3, which is documented behaviour.
+- Bypass is handled by setting 4. With it set, the owner account is bound by the rule too. Without a second reviewer,
+  the owner then cannot merge at all. That is the cost of option A's enforcement, and the owner must accept it.
 
 ## 3. Read-only evidence of the current settings
 
@@ -83,7 +92,9 @@ So today no enforcement exists. Nothing in this document is in force until the o
 - Until then, the job, if added, must be marked non-required, so it can run without blocking a merge that
   the checker does not yet exist to judge.
 - Sequence: (1) owner reviews and merges the checker and tests, (2) owner adds the job, (3) owner turns on
-  branch protection and CODEOWNERS, (4) only then is the check required.
+  branch protection and CODEOWNERS, (4) only then is the check required. Before step 1 the job fails with an explicit
+  "BOOTSTRAP STAGE, NOT AN ENFORCEMENT RESULT" message (`883f8c3` on `review/bootstrap-policy-check`). That failure is
+  expected, and it is not a passing run.
 
 ## 5. The job itself
 

@@ -49,3 +49,27 @@ Also in this round:
 
 Still open: no independent review of any candidate; the policy does not yet admit the web paths; no native spike has
 run (no OAuth clients exist); production does not run the backend change; live AI probes remain disabled.
+
+
+## Round: handoff corrections
+
+1. **Self-approval instructions removed.** No document asks anyone to approve their own change. The required review
+   needs a second account with write access, which GitHub's documentation requires for approvals. Option A and
+   option B are in `ci-policy-check.md` section 2a.
+2. **Outbox plan.** After the bootstrap and authorisation land on `main`, the candidate is recreated on the new base
+   `<M1>`, the ticket's `base_commit` is updated, and the new SHA `<C2>` is reported. Those SHAs are placeholders. None
+   has been created.
+3. **Backend gates added.** The factory project defines `backend-tests`, `backend-lint`, `backend-format` and
+   `backend-types`. The outbox ticket verifies all seven gates. `backend-tests` needs `JOURNAL_TEST_DATABASE_URL`, and a
+   missing variable fails the gate closed, with the variable's name and never its value. Tests: `test_project_gates.py`.
+4. **Bootstrap stage made explicit.** Before the checker is on `main`, the job fails with "BOOTSTRAP STAGE, NOT AN
+   ENFORCEMENT RESULT". That is documented as a stage, and it is never reported as a passing run (commit `883f8c3`).
+5. **Checker and tests in the ownership list.** `tools/` is code-owned, including `tools/policy_check.py` and
+   `tools/tests/`.
+6. **CODEOWNERS uncertainty replaced with GitHub's documented behaviour.** Pull requests use the base branch's
+   CODEOWNERS file, which is searched in `.github/`, the root and `docs/`, first found wins. The author's own approval is
+   not relied on, because the documentation does not say it counts. The sole-admin case is not addressed by the
+   documentation, so option B is stated as documentation, not enforcement.
+
+Still open: no authorisation is recorded, so no candidate can be admitted. No independent review exists. Native
+implementation, live AI probes, `main` and production are unchanged.

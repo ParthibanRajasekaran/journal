@@ -27,8 +27,12 @@ Goal: land the checker on `main`, then merge the outbox candidate. This request 
 - **Uncertainty:** the checker's rules are a re-implementation of `factory/policy_gate.py`. A cross-check test on the
   factory branch keeps them aligned, but that test only runs where the factory exists. The job is not required,
   because no protection is enabled yet.
-- **Owner action:** review `tools/` and the job, then merge `review/bootstrap-policy-check` through a pull request you
-  review yourself. Do not enable the status as required in this step.
+- **Reviewer required:** a second reviewer with write access, the one in section 2a of `ci-policy-check.md`. The author
+  cannot be the reviewer, and this package does not ask anyone to approve their own change.
+- **Bootstrap stage:** until this lands, the job fails with "BOOTSTRAP STAGE, NOT AN ENFORCEMENT RESULT" on pull requests
+  to `main`. That failure is expected. It is not a passing run, and it must not be reported as one.
+- **Owner action:** arrange the second reviewer, have that reviewer approve `review/bootstrap-policy-check`, then merge it.
+  Do not enable the status as required in this step.
 
 ### 1b. Admit the outbox candidate's web paths
 
@@ -62,13 +66,18 @@ Choose one:
 
 ### 1d. Settings that enforce review (owner settings, not repository code)
 
-- Branch protection on `main`: require a pull request with one approval, require review from code owners, dismiss
-  stale approvals on new pushes, require the `ci` check, restrict pushes, and disallow force pushes.
-- CODEOWNERS on `main` covering `.github/**`, `factory/**`, `tools/**`, `policy/**` and `docs/factory/**`.
+- Files: `.github/CODEOWNERS` on `main` (new), and branch protection (owner settings). Proposed CODEOWNERS and the full
+  settings list are in `ci-policy-check.md` section 2.
+- Protected paths listed as code-owned: `.github/`, `factory/`, `tools/` (which includes `tools/policy_check.py` and
+  `tools/tests/`), `policy/`, `docs/factory/`, `docs/adr/`.
+- Behaviour relied on, from GitHub's documentation: pull requests use the base branch's CODEOWNERS file; the file is
+  checked in `.github/`, the root and `docs/`, first found wins; a changed diff dismisses stale approvals when that
+  setting is on; the "do not allow bypassing" setting binds admins.
+- **Reviewer arrangement:** a second account with write access is needed for any required review to be satisfiable.
+  The author's own approval is not relied on, since the documentation does not say it counts.
 - **Read-only state today (31 October 2026):** no protection, no rulesets, no CODEOWNERS file, one collaborator.
-- **Uncertainty:** whether GitHub enforces CODEOWNERS from the base branch or from the pull request. Not verified.
-  Test in a throwaway repository before relying on it.
-- **Owner action:** apply the settings, and run the throwaway test.
+- **Owner action:** choose option A or option B in section 2a of `ci-policy-check.md`. Under option A, add the second
+  account, create the CODEOWNERS file, and apply the settings. Under option B, record that the controls are not enforced.
 
 ---
 

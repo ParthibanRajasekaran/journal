@@ -1,93 +1,107 @@
 # Outbox bootstrap and combined candidate: plan for review
 
-Status: plan. Nothing merged, nothing approved, nothing recorded as verified by the factory.
+Status: plan. Nothing merged, nothing approved, nothing recorded as verified by the factory. Values in
+`<angle brackets>` are placeholders. They are filled in only after the step that produces them runs.
 
 ## Current facts (checked 31 October 2026)
 
 | Item | Value |
 |---|---|
-| `main` | `b5f296f`. No `factory/`, no `tools/`, no checker. Not protected. |
-| Bootstrap checker | `review/bootstrap-policy-check` at `07e3ffe`, parent `main`. Stdlib only, 4 files plus the CI job. |
-| Combined candidate | `review/outbox-candidate-v2` at `8a4d74f`, parent `b5f296f`. 13 paths. |
-| Factory admission of the candidate | **Refused.** Ten `web/src` paths have no authorisation under the current policy. |
-| Independent review of the candidate | **None.** No authorised reviewer exists. Review is pending. |
+| `main` | `b5f296f`. No checker, no `tools/`, no `factory/`. Not protected. |
+| Bootstrap checker | `review/bootstrap-policy-check` at `883f8c3` (parent `main`). Checker, 12 tests, and a policy-check job with an explicit bootstrap-stage failure. |
+| Candidate (pre-recreation) | `review/outbox-candidate-v2` at `8a4d74f`, parent `b5f296f`. 13 paths. Gates run as information only. |
+| Ticket `base_commit` | `b5f296f`, pending recreation. |
+| Factory admission of the candidate | **Refused.** Ten `web/src` paths are not authorised under the current policy. |
+| Independent review | **None.** No authorised reviewer has reviewed any candidate. |
+
+## Bootstrap stage (documented, not an enforcement run)
+
+Until the checker is on `main`, the policy-check job cannot find `tools/policy_check.py` at the base. It fails with:
+
+> BOOTSTRAP STAGE, NOT AN ENFORCEMENT RESULT: the base branch has no tools/policy_check.py, so no change can be judged.
+
+That failure is expected. It is not a pass, and it is not reported as one. The job is not required, so the failure does
+not block merging, and the bootstrap pull request itself is reviewed by a person, as described in
+`authorization-package.md`.
 
 ## Bootstrap diff (smallest)
 
-Files, all in `07e3ffe`:
+`review/bootstrap-policy-check` at `883f8c3`, on top of `07e3ffe`:
 
-- `tools/policy_check.py`: the checker. Reads the policy and approvals at the base; reads the pull request as data.
-- `tools/__init__.py`, `tools/tests/__init__.py`, `tools/tests/test_policy_check.py`: 12 tests. They cover the decision
-  rules, the approval rules, and the trust regression: a pull request that replaces the checker is rejected by the
-  trusted checker and passes only when it judges itself.
-- `.github/workflows/ci.yml`: a `policy-check` job, marked as not required, that runs `tools/policy_check.py` from a
-  trusted checkout of the base commit.
+- `tools/policy_check.py`: stdlib checker. Reads the policy and approvals at the base. Reads the pull request as data.
+- `tools/__init__.py`, `tools/tests/__init__.py`, `tools/tests/test_policy_check.py`: 12 tests, covering the decision
+  rules, approval rules, and the trust regression.
+- `.github/workflows/ci.yml`: the policy-check job, with the bootstrap-stage check before the checker runs.
 
-Run result: `python3 -m unittest discover -s tools/tests -t . -p "test_*.py"` gives 12 tests, all passing.
+## Combined candidate (pre-recreation)
 
-## Combined candidate
+`8a4d74f`, from `b5f296f`, 13 paths:
 
-`8a4d74f`, built from `b5f296f` with exactly these 13 paths:
-
-- Web: `App.tsx`, `api.ts`, `api.test.ts`, `offline.ts`, `offline.test.ts`, `session.ts`, `vite-env.d.ts`,
+- Web (10): `App.tsx`, `api.ts`, `api.test.ts`, `offline.ts`, `offline.test.ts`, `session.ts`, `vite-env.d.ts`,
   `screens/AddMeal.tsx`, `screens/Today.tsx`, `screens/Settings.tsx`.
-- Backend: `backend/app/routes/meals.py`, `backend/tests/test_expected_account.py`.
-- Contract: `docs/openapi.yaml`.
+- Backend (2): `backend/app/routes/meals.py`, `backend/tests/test_expected_account.py`.
+- Contract (1): `docs/openapi.yaml`.
 
-Excluded on purpose: the factory, the policy, the approvals file, native-auth files, CI, and any Android or iOS file.
+It excludes the factory, the policy, the approvals file, CI, native-auth files and every Android or iOS file.
 
-Why both halves: the web fix sends `X-Journal-Expected-Account`, and the server's refusal is what makes a cross-account
-write safe. A web-only candidate is not independently deployable.
+The web fix sends `X-Journal-Expected-Account`, and the server's refusal is what makes a cross-account write safe.
+A web-only candidate is not independently deployable.
 
-### Informational gates (run on `8a4d74f`, not factory evidence)
+## Verification gates
 
-| Gate | Result |
-|---|---|
-| Web typecheck | pass |
-| Web unit tests | 71 pass |
-| Web build | pass |
-| Backend tests (local PostgreSQL test database) | 256 pass |
-| Ruff lint, ruff format, mypy | clean |
+The factory's project gates now cover both halves. A candidate is verified only with all seven:
 
-The candidate's identity and cleanliness were not checked by the factory, because the factory refused admission.
+| Gate | Command (cwd) | Needs |
+|---|---|---|
+| `web-typecheck` | `npm run --silent typecheck` (`web`) | the shared `web/node_modules` link |
+| `web-unit` | `npx vitest run` (`web`) | as above |
+| `web-build` | `npm run --silent build` (`web`) | as above |
+| `backend-tests` | `uv run --locked pytest -q` (`backend`) | `JOURNAL_TEST_DATABASE_URL` in the operator's environment. A missing variable fails the gate closed, with the variable's name and never its value. |
+| `backend-lint` | `uv run --locked ruff check . --output-format concise` (`backend`) | none |
+| `backend-format` | `uv run --locked ruff format --check .` (`backend`) | none |
+| `backend-types` | `uv run --locked mypy` (`backend`) | none |
 
-### Admission status (bootstrap checker, `b5f296f`..`8a4d74f`)
+Status of these gates on `8a4d74f`: **informational only.** They were run by hand on that commit, and the factory did
+not run them. Results at that time: web typecheck, 71 unit tests and build pass; backend 256 tests pass against the local
+PostgreSQL test database; ruff lint, format and mypy are clean. The factory's own gate runs are still pending.
 
-Ten violations, all `policy: not authorized ... web/src/*`. No violation on backend or docs paths, because those are
-already inside the current policy's roots.
+## After bootstrap and authorisation: recreate the candidate
 
-## Plan after authorisation
+These steps run only after the checker is on `main` and an authorisation for `web/src` is recorded on `main`. None of
+them has run.
 
-Only after both of these are recorded on `main`:
+1. Record the new base: `<M1>` is the `main` SHA after the bootstrap merge.
+2. Confirm the authorisation is on `<M1>`. Run `python3 tools/policy_check.py --repo . --base <M1> --head <M1>` and
+   check the admission result for the ticket's paths.
+3. Recreate the candidate on the new base. Create a worktree from `<M1>`, check out the same 13 paths from the source
+   commit used for `8a4d74f`, and commit. Record the new SHA as `<C2>`. Do not reuse `8a4d74f`: its parent is `b5f296f`.
+4. Update the ticket's `base_commit` to `<M1>`, and its `allowed_paths` to the 13 paths. Make this a separate commit, on
+   its own branch from `<M1>`.
+5. Run `python3 -m factory plan <ticket>` and confirm "ready to run".
+6. Run `python3 -m factory run <ticket> --candidate <C2>` with `JOURNAL_TEST_DATABASE_URL` set. The controller checks
+   identity and cleanliness before gates and after gates and review, and records evidence against `<C2>`.
+7. Report `<C2>`, the evidence path, and the result. Do not report a pass from any run that was not made by the factory.
 
-1. the bootstrap checker, or equivalent, is on `main`, and
-2. `web/src/*` is authorised, by option A or by the narrow approval in `docs/factory/policy-exceptions.json`.
+If any authorised item changes the web or backend source, the candidate is rebuilt, and the new SHA is reported.
 
-Then, in order:
+## Independent review
 
-1. Update the outbox ticket's `allowed_paths` to the 13 paths, in its own reviewable change.
-2. Run `python3 -m factory plan <ticket>` and confirm "ready to run".
-3. Run `python3 -m factory run <ticket> --candidate 8a4d74f`. The controller refuses a dirty worktree, checks identity
-   before and after gates, and after review, and records evidence against the exact SHA.
-4. The factory's dry-run reviewer is **not** independent review, and the controller will refuse it as evidence of
-   readiness.
+Status: pending. No authorised reviewer has reviewed `8a4d74f` or any later candidate. The dry-run adapter is not
+review, and neither is the author's own review, nor this document.
 
-## Independent review: instructions
+Reviewer instructions, for `<C2>` once it exists:
 
-Status: pending. No authorised reviewer has reviewed `8a4d74f`. Do not claim a review from a dry-run adapter, from the
-author, or from this document.
+1. Check out `<C2>`. Confirm `git diff --stat <M1> <C2>` lists exactly the 13 paths.
+2. Read `offline.ts` and confirm that no path sends a write while the outbox is unsafe.
+3. Read `meals.py` and confirm that the expected-account check runs before any read or write, and that a mismatch returns 409.
+4. Run the seven gates from a clean checkout of `<C2>`.
+5. Report findings against `<C2>`. Any new commit is a new candidate and needs a new review.
 
-Reviewer, for `8a4d74f`:
-
-1. Check out `8a4d74f` and confirm `git diff --stat b5f296f 8a4d74f` lists exactly the 13 paths above.
-2. Read the web outbox (`offline.ts`) and check that no path sends a write while the outbox is unsafe.
-3. Read `meals.py` and check that the expected-account check runs before any read or write, and that a
-   mismatch returns 409.
-4. Run the gates listed above, from a clean checkout of `8a4d74f`.
-5. Report findings against `8a4d74f`. Any new commit is a new candidate, and needs a new review.
+The reviewer is a second account with write access, from the arrangement in `ci-policy-check.md` section 2a. The author
+of the candidate does not review it.
 
 ## What this plan does not show
 
 - That production runs the backend change. It does not.
-- That the web fix works against the real backend in a browser. The Playwright end-to-end tests were not run on this candidate.
-- That the factory can verify this candidate. It cannot until authorisation is recorded.
+- That the web fix works against the real backend in a browser. The Playwright end-to-end tests were not run.
+- That the factory can verify any candidate. It cannot until the authorisation is recorded on `main`.

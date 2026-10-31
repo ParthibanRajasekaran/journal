@@ -58,6 +58,57 @@
         "build"
       ],
       "timeout": 600
+    },
+    "backend-tests": {
+      "cwd": "backend",
+      "argv": [
+        "uv",
+        "run",
+        "--locked",
+        "pytest",
+        "-q"
+      ],
+      "timeout": 900,
+      "requires_env": [
+        "JOURNAL_TEST_DATABASE_URL"
+      ]
+    },
+    "backend-lint": {
+      "cwd": "backend",
+      "argv": [
+        "uv",
+        "run",
+        "--locked",
+        "ruff",
+        "check",
+        ".",
+        "--output-format",
+        "concise"
+      ],
+      "timeout": 300
+    },
+    "backend-format": {
+      "cwd": "backend",
+      "argv": [
+        "uv",
+        "run",
+        "--locked",
+        "ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "timeout": 300
+    },
+    "backend-types": {
+      "cwd": "backend",
+      "argv": [
+        "uv",
+        "run",
+        "--locked",
+        "mypy"
+      ],
+      "timeout": 600
     }
   }
 }
