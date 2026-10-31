@@ -68,6 +68,8 @@ test("an unknown API route answers with a problem document, not a page", async (
 
 test("the sign-in controls can be reached by keyboard", async ({ page }) => {
   await page.goto("/");
+  // Focus starts on the page only after a click, so the first Tab then reaches the first control.
+  await page.locator("h1").click();
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   const focused = await page.evaluate(() => document.activeElement?.tagName);
