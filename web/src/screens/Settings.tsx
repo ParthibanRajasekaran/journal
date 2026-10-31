@@ -120,12 +120,16 @@ function EncouragementCard({ profile, onSaved }: { profile: Profile; onSaved: (p
             {" "}A gentle note when you log, and when you reach a protein goal. Turn it off to hide every note.
           </span>
         </span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={profile.encouragement_enabled}
-          onChange={(e) => void toggle(e.target.checked)}
-        />
+        <span className="toggle">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label="Show encouragement"
+            checked={profile.encouragement_enabled}
+            onChange={(e) => void toggle(e.target.checked)}
+          />
+          <span className="toggle-track" aria-hidden="true" />
+        </span>
       </label>
       {message && <p className="error" role="alert">{message}</p>}
     </section>
