@@ -103,7 +103,9 @@ export type EstimateReply =
     };
 
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
-const BASE = "/api/v1";
+// Empty for the web build, which is served by the API. Native builds set VITE_API_BASE to the
+// HTTPS origin of the backend, for example https://journal.example.
+const BASE = `${import.meta.env.VITE_API_BASE ?? ""}/api/v1`;
 
 // Shown when the connection drops, so no raw browser message reaches the user.
 export const OFFLINE_MESSAGE = "Can't reach Journal right now. Check your connection, then try again.";
