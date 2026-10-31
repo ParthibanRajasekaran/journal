@@ -43,10 +43,25 @@ function TargetsForm({ profile, onSaved }: { profile: Profile; onSaved: (p: Prof
   const [calories, setCalories] = useState(profile.daily_targets.calories?.toString() ?? "");
   const [protein, setProtein] = useState(profile.daily_targets.protein_g?.toString() ?? "");
   const [message, setMessage] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  // Checked before anything is sent, so an out-of-range number never reaches the server.
+  function rangeProblem(): string | null {
+    if (calories !== "" && (!Number.isFinite(Number(calories)) || Number(calories) < 800 || Number(calories) > 6000)) {
+      return "Calories must be between 800 and 6000.";
+    }
+    if (protein !== "" && (!Number.isFinite(Number(protein)) || Number(protein) < 0 || Number(protein) > 400)) {
+      return "Protein must be between 0 and 400 grams.";
+    }
+    return null;
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setMessage(null);
+    const failure = rangeProblem();
+    setProblem(failure);
+    if (failure) return;
     try {
       const saved = await api.updateMe({
         // An empty field clears that target.
@@ -71,7 +86,11 @@ function TargetsForm({ profile, onSaved }: { profile: Profile; onSaved: (p: Prof
       <input id="prot" inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} />
       <p className="muted fine-print" style={{ textAlign: "left" }}>Leave a field empty to clear that target.</p>
       <div className="row" style={{ marginTop: 12 }}>
-        <span className="muted" role="status">{message}</span>
+        {problem ? (
+          <span className="error" role="alert">{problem}</span>
+        ) : (
+          <span className="muted" role="status">{message}</span>
+        )}
         <button type="submit" className="primary">Save targets</button>
       </div>
     </form>
