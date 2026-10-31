@@ -26,7 +26,8 @@
     "**/auth/**",
     "**/authz/**",
     "src/services/biometricAuth.ts",
-    "**/.env*"
+    "**/.env*",
+    "docs/factory/policy-exceptions.json"
   ],
   "gates": {
     "web-typecheck": {

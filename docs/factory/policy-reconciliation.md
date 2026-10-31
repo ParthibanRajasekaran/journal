@@ -35,16 +35,32 @@ Recommendation: option A, restricted to `web/src/**` and `web/e2e/**`. `web/andr
 are native shells and should stay human-only. `factory/**` should stay human-only, because the
 controller decides what agents may do.
 
-## Enforcement gap found while doing this
+## What is enforced now (review R4)
 
-Nothing evaluates `agents/change_policy.rego` against a change set. The CI workflow runs `make check`,
-which runs `opa check` and `opa test` on `policy/`. `agents/` has no `*_test.rego`, and no workflow
-passes a diff to `journal.agents.change`. ADR-006 (e) and `policy/README.md` describe enforcement that
-does not exist yet. Until a change-set check is wired into CI, the policy is documentation, and the
-factory's scope check is the only path-level control on agent writes.
+- **Admission** (`factory/policy_gate.py`, used by `factory/controller/core.py`): a ticket's allowed paths
+  must be inside the policy's allowed roots, or covered by an approval status `approved` with a named
+  approver. Pending entries authorize nothing. Refused before any run record or worktree exists.
+- **Trusted inputs:** the policy and the approvals are read from the run's base commit, not from the
+  candidate. `docs/factory/policy-exceptions.json` is always protected, so a change set cannot approve
+  itself, whatever a project file says.
+- **Change-set check:** every candidate change is judged against the same rule, with protected paths
+  refused even when allowed.
+- **CI command:** `python3 -m factory policy-check --base REF --head REF` judges a diff and exits 2 on
+  any violation. It is not yet wired into CI; see `docs/factory/proposals/`.
+- **Plan status:** `plan` reports "ready to run" or "review preparation only: owner approval is required
+  before execution".
+
+## What is not enforced yet
+
+- **CI does not run `policy-check`.** That needs a change to `.github/workflows/ci.yml`, which is
+  human-review-only. The snippet is in `docs/factory/proposals/ci-policy-check.md`, not applied.
+- **Option A is not in force.** `policy/agents/change_policy.rego` is unchanged. The proposal is in
+  `docs/factory/proposals/change_policy.option-a.rego`. Its OPA tests pass, and the Python enforcement
+  agrees with it on a path matrix.
+- **No owner approval is recorded.** `docs/factory/policy-exceptions.json` has no approved entry, so the
+  outbox ticket is refused at admission. That is the correct state until the owner decides.
 
 ## What the tests do not prove
 
-They prove the two rule sets agree as written. They do not check that the policy is correct, and they
-do not enforce it. Wiring `journal.agents.change` into CI, with its own tests, is a separate change for
-the owner.
+They prove the two rule sets agree as written, and that the enforcement refuses what the policy refuses. They
+do not prove the policy itself is correct, and they do not stop a tool from acting outside the worktree.

@@ -25,6 +25,17 @@ from factory.ticket import validate_ticket
 IDENTITY = ["-c", "user.name=test", "-c", "user.email=test@localhost"]
 PY = sys.executable
 
+FIXTURE_POLICY = """package journal.agents.change
+allowed_globs := [
+	"app/**",
+	"docs/**",
+]
+protected_globs := [
+	"policy/**",
+	"factory/**",
+]
+"""
+
 CONFIG = {
     "budget": {"max_ticket_usd": 5.0, "per_call_reserve_usd": 0.5, "contingency_usd": 0.25, "warn_fraction": 0.7},
     "limits": {"max_repairs": 2},
@@ -103,6 +114,8 @@ class Fixture(unittest.TestCase):
             "app/feature.txt": "fine\n",
             "policy/rule.txt": "rule\n",
             "factory/config.json": "{}\n",
+            # A minimal policy at the base commit. Admission fails closed without one.
+            "policy/agents/change_policy.rego": FIXTURE_POLICY,
         }.items():
             path = self.repo / rel
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,7 +219,8 @@ class ScopeAndProtection(Fixture):
 
     def test_agent_cannot_edit_protected_config_even_when_allowed(self):
         adapter = ScriptedAdapter([{"files": {"factory/config.json": '{"budget": {"max_ticket_usd": 999}}\n'}}], [APPROVE_ALL])
-        run_id = self.controller(adapter).run(make_ticket(allowed_paths=["**"]))
+        # The ticket itself stays within policy; the candidate attempts the protected edit.
+        run_id = self.controller(adapter).run(make_ticket())
         run = self.ledger.get_run(run_id)
         self.assertEqual(run["state"], state.BLOCKED)
         self.assertIn("protected path changed: factory/config.json", run["stop_reason"])
@@ -222,7 +236,7 @@ class ScopeAndProtection(Fixture):
             [{"files": {"factory/config.json": '{"budget": {"max_ticket_usd": 999}}\n', "app/feature.txt": "good\n"}}],
             [APPROVE_ALL],
         )
-        run_id = self.controller(adapter).run(make_ticket(allowed_paths=["app/**", "factory/**"]))
+        run_id = self.controller(adapter).run(make_ticket())
         self.assertEqual(self.ledger.get_run(run_id)["state"], state.BLOCKED)
 
 
@@ -356,7 +370,7 @@ class CrashAndResume(Fixture):
             self.controller(adapter, config_hash="changed").resume(run_id)
 
 
-class StateAndSchemas(unittest.TestCase):
+class StateAndSchemas(Fixture):
     def test_illegal_transitions_are_refused(self):
         with self.assertRaises(state.IllegalTransition):
             state.check_transition(state.READY, state.VERIFYING)
@@ -371,9 +385,8 @@ class StateAndSchemas(unittest.TestCase):
 
     def test_plan_reports_worst_case_budget_without_dispatch(self):
         adapter = DryRunAdapter()
-        with tempfile.TemporaryDirectory() as tmp:
-            controller = Controller(Path(tmp), self.ledger_for(tmp), adapter, CONFIG, PROJECT, "h")
-            plan = controller.plan(make_ticket(max_repairs=2))
+        controller = Controller(self.repo, self.ledger, adapter, CONFIG, PROJECT, "h")
+        plan = controller.plan(make_ticket(max_repairs=2))
         self.assertEqual(plan["worst_case_calls"], 6)
         self.assertFalse(plan["independent_review"])
 

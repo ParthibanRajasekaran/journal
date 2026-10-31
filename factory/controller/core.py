@@ -15,6 +15,13 @@ from factory import gitops, state
 from factory.common import FactoryError, now, read_json, sha256_text, write_json
 from factory.controller.decision import decide
 from factory.evidence import EvidenceGuard
+from factory.policy_gate import (
+    APPROVALS_PATH,
+    approved_prefixes,
+    change_violations,
+    load_policy_at,
+    ticket_authorization_problems,
+)
 from factory.gates import run_gate
 from factory.ledger import BudgetExceeded, DuplicateDispatch, Ledger
 from factory.locks import WorkspaceLock
@@ -70,8 +77,15 @@ class Controller:
         per_call = float(self.config["budget"]["per_call_reserve_usd"])
         repairs = int(ticket["max_repairs"])
         calls = (repairs + 1) * 2  # implementation plus review, for every attempt
+        base = gitops.resolve(self.repo, ticket.get("base_commit") or "HEAD")
+        authorization = ticket_authorization_problems(
+            list(ticket["allowed_paths"]), load_policy_at(self.repo, base), approved_prefixes(self.repo, base)
+        )
         return {
             "ticket": ticket["id"],
+            "authorized_by_policy": not authorization,
+            "authorization_problems": authorization,
+            "status": "ready to run" if not authorization else "review preparation only: owner approval is required before execution",
             "route": ROUTE,
             "specialists": ticket.get("specialists", []),
             "adapter": self.adapter.name,
@@ -90,6 +104,13 @@ class Controller:
         require_valid(ticket, self.project, self.config["budget"]["max_ticket_usd"], self.config["limits"]["max_repairs"])
         base = gitops.resolve(self.repo, ticket.get("base_commit") or "HEAD")
         start = gitops.resolve(self.repo, candidate_ref) if candidate_ref else base
+        # Admission: the ticket's paths must be authorized by the policy at the base commit, or by an approval
+        # the owner recorded there. Refused before any run record or worktree exists.
+        policy = load_policy_at(self.repo, base)
+        approved = approved_prefixes(self.repo, base)
+        problems = ticket_authorization_problems(list(ticket["allowed_paths"]), policy, approved)
+        if problems:
+            raise FactoryError("not authorized by policy: " + "; ".join(problems))
         if candidate_ref:
             # A candidate is a commit. Uncommitted corrections in the primary checkout would not be
             # part of it, so verifying them would not verify the commit.
@@ -362,10 +383,12 @@ class Controller:
         violations = check_scope(
             changed,
             ticket["allowed_paths"],
-            list(ticket.get("protected_paths", [])) + list(self.project.get("protected_paths", [])),
+            list(ticket.get("protected_paths", [])) + list(self.project.get("protected_paths", [])) + [APPROVALS_PATH],
         )
         if not changed:
             violations.append("the candidate changes no files")
+        base_policy = load_policy_at(self.repo, base)
+        violations.extend(change_violations(changed, base_policy, approved_prefixes(self.repo, base)))
         # Evidence is for a commit. Any uncommitted or untracked file means the tested tree is not that commit.
         violations.extend(p for p in guard.problems if p.startswith("worktree has uncommitted"))
         gates: list[dict] = []

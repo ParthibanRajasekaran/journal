@@ -289,6 +289,19 @@ def cmd_handoffs(ctx: Context, args) -> int:
     return 0
 
 
+def cmd_policy_check(ctx: Context, args) -> int:
+    """Change-set check for CI: the diff between two refs, judged by the policy and approvals at the base."""
+    from factory import gitops as _g
+    from factory.policy_gate import approved_prefixes, change_violations, changed_between, load_policy_at
+
+    base = _g.resolve(ctx.repo, args.base)
+    head = _g.resolve(ctx.repo, args.head)
+    changed = changed_between(ctx.repo, base, head)
+    violations = change_violations(changed, load_policy_at(ctx.repo, base), approved_prefixes(ctx.repo, base))
+    _print({"base": base[:12], "head": head[:12], "changed": len(changed), "violations": violations, "passed": not violations}, args.json)
+    return 0 if not violations else 2
+
+
 def cmd_usage(ctx: Context, args) -> int:
     lineage_rows = ctx.ledger._conn.execute("select id, ticket_id from lineages where ticket_id = ?", (args.ticket,)).fetchall()
     if not lineage_rows:
@@ -333,6 +346,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("attest", parents=[json_after], help="record an owner attestation the CLI cannot verify itself")
     p.add_argument("provider", choices=[CLAUDE])
     p.add_argument("key", choices=["extra-usage-disabled"])
+    p = sub.add_parser("policy-check", parents=[json_after], help="judge a diff between two refs against the policy at the base (for CI)")
+    p.add_argument("--base", required=True)
+    p.add_argument("--head", required=True)
     p = sub.add_parser("handoffs", parents=[json_after], help="list durable handoffs for a run")
     p.add_argument("run")
     return parser
@@ -347,6 +363,7 @@ COMMANDS = {
     "pause": cmd_pause,
     "resume": cmd_resume,
     "usage": cmd_usage,
+    "policy-check": cmd_policy_check,
     "providers": cmd_providers,
     "provider-toggle": cmd_provider_toggle,
     "attest": cmd_attest,
