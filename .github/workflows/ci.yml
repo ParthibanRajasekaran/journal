@@ -79,6 +79,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Bootstrap stage check
+        run: |
+          # Before the checker lands on the base branch there is nothing trusted to run. That is a stage,
+          # not an enforcement result, so this step fails with a message that says so.
+          if [ ! -f trusted/tools/policy_check.py ]; then
+            echo "::error::BOOTSTRAP STAGE, NOT AN ENFORCEMENT RESULT: the base branch has no tools/policy_check.py, so no change can be judged. Land the checker through human review first."
+            exit 1
+          fi
       - name: Change-set policy
         working-directory: trusted
         run: python3 tools/policy_check.py --repo "$GITHUB_WORKSPACE/pr" --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
