@@ -111,3 +111,41 @@ describe("api client", () => {
     expect(init.headers["If-Match"]).toBe("2");
   });
 });
+
+describe("request ownership guard", () => {
+  const meal = {
+    client_id: "3f1c2a9e-5b7d-4e8a-9c01-2d6f7a8b9c10",
+    meal_type: "lunch" as const,
+    eaten_at: "2026-10-29T12:00:00.000Z",
+    name: "Soup",
+    calories: 200,
+    protein_g: 10,
+    carbs_g: 20,
+    fat_g: 5,
+    source: "manual" as const,
+  };
+
+  it("does not resend a request after a refresh if the session changed meanwhile", async () => {
+    // 1: the meal is refused with 401. 2: the refresh runs, and during it the session changes hands.
+    let owner = "account-a";
+    const spy = vi.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/auth/refresh")) {
+        owner = "account-b";
+        return new Response(null, { status: 204 });
+      }
+      return new Response(null, { status: 401 });
+    });
+    vi.stubGlobal("fetch", spy);
+
+    await expect(api.createMeal(meal, () => owner === "account-a")).rejects.toMatchObject({ status: 401 });
+    // Only the first request and the refresh were made. The meal was not replayed under account B.
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses to send at all when the session already belongs to someone else", async () => {
+    const spy = mockFetch(() => new Response(null, { status: 201 }));
+    await expect(api.createMeal(meal, () => false)).rejects.toMatchObject({ status: 401 });
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+

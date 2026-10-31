@@ -7,6 +7,7 @@ import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
 import { localDay } from "./dates";
 import { flushQueue, quarantineLegacy } from "./offline";
+import { setSessionOwner } from "./session";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
 type Tab = "today" | "week" | "settings";
@@ -36,6 +37,10 @@ export function App() {
   useEffect(() => {
     quarantineLegacy();
   }, []);
+  // Recorded before the flush below runs, so a flush always sees the account the session belongs to.
+  useEffect(() => {
+    setSessionOwner(ownerId);
+  }, [ownerId]);
   useEffect(() => {
     if (!ownerId) return;
     const flush = () => void flushQueue(ownerId);

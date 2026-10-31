@@ -141,10 +141,17 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+// Raised instead of sending when the session now belongs to another account. Nothing is sent.
+export const STALE_SESSION = "The signed-in account changed. This request was not sent.";
+
+// `guard` is checked before the first send and again before any resend after a refresh. A request
+// made for one account is never replayed on another account's session.
+async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>, guard?: () => boolean): Promise<T> {
+  if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
   let response = await send(method, path, body, extra);
   if (response.status === 401 && !path.startsWith("/auth/")) {
     if (await refreshSession()) {
+      if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
       response = await send(method, path, body, extra);
     } else if (typeof window !== "undefined") {
       window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
@@ -180,8 +187,8 @@ export const api = {
   day: (date: string, tz: string) => request<DaySummary>("GET", `/days/${date}?tz=${encodeURIComponent(tz)}`),
   week: (start: string, tz: string) => request<Totals[]>("GET", `/week?start=${start}&tz=${encodeURIComponent(tz)}`),
 
-  createMeal: (meal: NewMeal) =>
-    request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),
+  createMeal: (meal: NewMeal, guard?: () => boolean) =>
+    request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }, guard),
   updateMeal: (meal: Pick<Meal, "id" | "version">, patch: Partial<Omit<NewMeal, "client_id" | "source">>) =>
     request<Meal>("PATCH", `/meals/${meal.id}`, patch, { "If-Match": String(meal.version) }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),
