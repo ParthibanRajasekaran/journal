@@ -26,3 +26,26 @@ claim production or native readiness. Rerun review after any change to a candida
 - Option A is not in force. The outbox ticket remains refused at admission until an owner approval is recorded.
 - The `ios/` shell has not been moved under `web/`, so no iOS build has been run from this branch.
 - Live AI probes remain disabled. No owner attestation exists.
+
+
+## Round: outbox bootstrap, native transaction boundary, authorisation split
+
+Three issues from the previous report were corrected:
+
+1. **The outbox candidate was tied to native auth.** It is now a separate candidate, `8a4d74f`, built from the base
+   with the web outbox paths and the backend account check only. It contains no native-auth, factory or policy file.
+2. **The authorisation package bundled unrelated decisions.** It is now two independent requests: outbox
+   bootstrap and candidate, and native sign-in. Each item states files, purpose, uncertainty and owner action.
+3. **The CI bootstrap was not separated from enforcement.** The checker is now a stdlib module on
+   `review/bootstrap-policy-check` (`07e3ffe`), with its own tests and a non-required job. The workflow-replacement
+   gap and the required owner settings are stated separately. Read-only settings checks show none are in place.
+
+Also in this round:
+
+- **Native transaction boundary:** consumption and session creation share one transaction, with rollback tests
+  (SQLite). A mutation that commits on failure fails them. Postgres and crash rollback are pending in `EVIDENCE.md`.
+- **Evidence register:** every native-auth claim is marked demonstrated, partial or pending, with what would
+  demonstrate it.
+
+Still open: no independent review of any candidate; the policy does not yet admit the web paths; no native spike has
+run (no OAuth clients exist); production does not run the backend change; live AI probes remain disabled.

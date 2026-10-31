@@ -3,9 +3,13 @@
 Status: proposal, not applied. `.github/workflows/ci.yml` and branch settings are human-owned. This document
 separates what the repository can enforce from what needs GitHub owner settings, and says which is which.
 
+Bootstrap status: the stdlib checker and this job are on `review/bootstrap-policy-check` at `07e3ffe`, not on
+`main`. The job in that commit is not required. The factory package's `policy-check` command implements the same
+rules; the job calls `tools/policy_check.py`, so the job does not need the factory package on `main`.
+
 ## 1. The checker runs from a trusted checkout (repository code, proven by test)
 
-`python3 -m factory policy-check --repo <PR checkout> --base <sha> --head <sha>` reads the policy and approvals
+`python3 tools/policy_check.py --repo <PR checkout> --base <sha> --head <sha>` reads the policy and approvals
 at the base commit, and reads the pull request's git data as data. Run from a trusted checkout of the base
 commit (`working-directory: trusted`), it cannot be replaced by the pull request's own checker. Two regressions
 in `factory/tests/test_policy_check_trust.py` cover this: the trusted checker rejects the pull request, and the
@@ -108,7 +112,7 @@ So today no enforcement exists. Nothing in this document is in force until the o
           python-version: "3.13"
       - name: Change-set policy
         working-directory: trusted
-        run: python3 -m factory policy-check --repo "$GITHUB_WORKSPACE/pr" --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
+        run: python3 tools/policy_check.py --repo "$GITHUB_WORKSPACE/pr" --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}"
 ```
 
 Limits: this checks policy only. It does not run gates or an independent review. The job still runs the pull request's

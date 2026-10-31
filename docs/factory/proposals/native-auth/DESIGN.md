@@ -47,10 +47,19 @@ Order of checks (**proven** in the model except where noted):
 5. The token's `nonce` claim must be present and equal to this attempt's nonce, compared by hash. Missing,
    or not equal: `401`, and the attempt stays pending so the same login can still complete. (`test_missing_nonce...`,
    `test_a_token_from_attempt_a...`, `test_a_restored_token...`)
-6. Consume the attempt with one statement, `UPDATE ... SET state = 'consumed' WHERE attempt_hash = $1 AND state = 'pending' AND expires_at > now`.
-   Exactly one concurrent caller succeeds. Others get `401`. (`test_concurrent_completions...`, SQLite only)
-7. Upsert the user by `sub`, apply the adult-confirmation rule, start a session, and return
-   `200 {access_token, refresh_token, expires_in}`.
+6. **Transaction boundary.** `BEGIN IMMEDIATE`. Consume the attempt with
+   `UPDATE ... SET state = 'consumed' WHERE attempt_hash = $1 AND state = 'pending' AND expires_at > now`, and
+   require exactly one changed row. Then, on the same connection and in the same transaction, upsert the user
+   by `sub`, apply the adult-confirmation rule, and insert the session row. `COMMIT` makes the consumption and the
+   session visible together. Any failure, including a failure in the session insert, runs `ROLLBACK`. The attempt
+   then stays `pending` and no session exists, so the same login can be retried within its window.
+   (`test_a_failed_session_insert_rolls_back_the_consumption`, `test_the_same_attempt_completes_once_the_failure_is_gone`,
+   `test_a_refused_completion_leaves_no_session_behind`. A mutation that commits on failure fails them.)
+   Exactly one concurrent caller consumes the attempt, and only that caller creates a session.
+   (`test_concurrent_completions_create_exactly_one_session`, SQLite only.)
+7. After `COMMIT`, issue tokens: `200 {access_token, refresh_token, expires_in}`. Token issuance is outside the
+   transaction, so a failure to sign a token does not undo a committed session. That case is treated as a server
+   error, and the client starts a new attempt. This ordering is a decision to review, not yet proven.
 
 Verification comes before consumption. A wrong token does not burn the attempt, so a legitimate login is not
 lost to a stray or copied token. (The consequence is that a token can be checked many times before the attempt is
@@ -91,4 +100,9 @@ Request body: `{ "attempt_secret": "..." }`. Idempotent. Cancelling a completed 
   client behaviour is unknown until the spike shows it.
 - iOS restored sign-in with a nonce always signs in, as the plugin source states. **Proven from source read;
   unproven on a device.**
-- Postgres row-locking behaviour for the consume statement. **Unproven** in this repository.
+- Postgres row-locking behaviour for the consume statement and the session insert. **Unproven** in this repository.
+  The SQLite tests prove the transaction semantics only.
+- Rollback on a real process crash between the session insert and `COMMIT`. **Unproven**. The tests simulate
+  a failing callback, not a killed process.
+
+Evidence status for every item above is kept in `EVIDENCE.md`.

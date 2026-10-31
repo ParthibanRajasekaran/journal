@@ -59,6 +59,11 @@ class AttemptStore:
               expires_at real not null,
               created_at real not null
             );
+            create table if not exists sessions (
+              session_id integer primary key autoincrement,
+              subject text not null,
+              attempt_hash text not null
+            );
             """
         )
 
@@ -78,11 +83,28 @@ class AttemptStore:
             (digest(attempt_secret),),
         )
 
-    def complete(self, attempt_secret: str, token: Claims) -> str:
-        """Returns the subject on success. Raises Refused otherwise."""
+    @staticmethod
+    def default_session(conn: sqlite3.Connection, subject: str, attempt_hash: str) -> None:
+        conn.execute("insert into sessions (subject, attempt_hash) values (?, ?)", (subject, attempt_hash))
+
+    def complete(
+        self,
+        attempt_secret: str,
+        token: Claims,
+        create_session: Callable[[sqlite3.Connection, str, str], None] | None = None,
+    ) -> str:
+        """Returns the subject on success. Raises Refused otherwise.
+
+        Transaction boundary: the attempt is consumed and the session is created in ONE transaction.
+        Checks that only read run first. Then BEGIN IMMEDIATE takes the write lock, the attempt is changed
+        from pending to consumed, and create_session runs on the same connection. COMMIT makes both visible
+        together. Any exception, including one from create_session, ROLLBACK undoes both, so the attempt
+        stays pending and no session exists. Exactly one concurrent completion can consume the attempt.
+        """
+        attempt_hash = digest(attempt_secret)
         row = self._conn.execute(
             "select nonce_hash, state, expires_at from attempts where attempt_hash = ?",
-            (digest(attempt_secret),),
+            (attempt_hash,),
         ).fetchone()
         if row is None:
             raise Refused("unknown attempt")
@@ -95,14 +117,24 @@ class AttemptStore:
             raise Refused("token has no nonce; a restored sign-in cannot complete an attempt")
         if digest(token.nonce) != nonce_hash:
             raise Refused("token nonce does not belong to this attempt")
-        # Atomic consumption: exactly one concurrent caller changes the row from pending to consumed.
-        cur = self._conn.execute(
-            "update attempts set state = 'consumed' where attempt_hash = ? and state = 'pending' and expires_at > ?",
-            (digest(attempt_secret), self._clock()),
-        )
-        if cur.rowcount != 1:
-            raise Refused("attempt was consumed or expired by another request")
+        session_writer = create_session or self.default_session
+        self._conn.execute("begin immediate")
+        try:
+            cur = self._conn.execute(
+                "update attempts set state = 'consumed' where attempt_hash = ? and state = 'pending' and expires_at > ?",
+                (attempt_hash, self._clock()),
+            )
+            if cur.rowcount != 1:
+                raise Refused("attempt was consumed or expired by another request")
+            session_writer(self._conn, token.subject, attempt_hash)
+            self._conn.execute("commit")
+        except BaseException:
+            self._conn.execute("rollback")
+            raise
         return token.subject
+
+    def session_count(self, subject: str) -> int:
+        return self._conn.execute("select count(*) from sessions where subject = ?", (subject,)).fetchone()[0]
 
     def state_of(self, attempt_secret: str) -> str | None:
         row = self._conn.execute("select state from attempts where attempt_hash = ?", (digest(attempt_secret),)).fetchone()

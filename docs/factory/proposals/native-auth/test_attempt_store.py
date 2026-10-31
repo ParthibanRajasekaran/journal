@@ -120,5 +120,84 @@ class AttemptTests(unittest.TestCase):
             self.store.complete(current["attempt_secret"], self.token(old["nonce"]))
 
 
+class TransactionBoundaryTests(unittest.TestCase):
+    """Attempt consumption and session creation commit together or not at all."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.clock = Clock()
+        self.path = os.path.join(self.dir, "t.sqlite")
+        self.store = AttemptStore(self.path, clock=self.clock)
+
+    def tearDown(self):
+        self.store._conn.close()
+
+    def sessions_for(self, subject):
+        return self.store._conn.execute("select count(*) from sessions where subject = ?", (subject,)).fetchone()[0]
+
+    def test_a_failed_session_insert_rolls_back_the_consumption(self):
+        a = self.store.create()
+
+        def broken_session(conn, subject, attempt_hash):
+            conn.execute("insert into sessions (subject, attempt_hash) values (?, ?)", (subject, attempt_hash))
+            raise RuntimeError("database went away after the session row was written")
+
+        with self.assertRaisesRegex(RuntimeError, "database went away"):
+            self.store.complete(a["attempt_secret"], Claims(nonce=a["nonce"], subject="usr_a"), broken_session)
+        self.assertEqual(self.store.state_of(a["attempt_secret"]), "pending")
+        self.assertEqual(self.sessions_for("usr_a"), 0)
+
+    def test_the_same_attempt_completes_once_the_failure_is_gone(self):
+        a = self.store.create()
+
+        def broken(conn, subject, attempt_hash):
+            raise RuntimeError("transient")
+
+        with self.assertRaises(RuntimeError):
+            self.store.complete(a["attempt_secret"], Claims(nonce=a["nonce"], subject="usr_a"), broken)
+        self.store.complete(a["attempt_secret"], Claims(nonce=a["nonce"], subject="usr_a"))
+        self.assertEqual(self.store.state_of(a["attempt_secret"]), "consumed")
+        self.assertEqual(self.sessions_for("usr_a"), 1)
+
+    def test_success_writes_the_consumption_and_the_session_together(self):
+        a = self.store.create()
+        self.store.complete(a["attempt_secret"], Claims(nonce=a["nonce"], subject="usr_a"))
+        self.assertEqual(self.store.state_of(a["attempt_secret"]), "consumed")
+        self.assertEqual(self.sessions_for("usr_a"), 1)
+
+    def test_a_refused_completion_leaves_no_session_behind(self):
+        a = self.store.create()
+        with self.assertRaises(Refused):
+            self.store.complete(a["attempt_secret"], Claims(nonce="wrong", subject="usr_a"))
+        self.assertEqual(self.sessions_for("usr_a"), 0)
+
+    def test_concurrent_completions_create_exactly_one_session(self):
+        a = self.store.create()
+        barrier = threading.Barrier(10)
+        outcomes = []
+        lock = threading.Lock()
+
+        def attempt():
+            store = AttemptStore(self.path, clock=self.clock)
+            barrier.wait()
+            try:
+                store.complete(a["attempt_secret"], Claims(nonce=a["nonce"], subject="usr_a"))
+                result = "ok"
+            except Refused:
+                result = "refused"
+            finally:
+                store._conn.close()
+            with lock:
+                outcomes.append(result)
+
+        threads = [threading.Thread(target=attempt) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(outcomes.count("ok"), 1, outcomes)
+        self.assertEqual(self.sessions_for("usr_a"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
