@@ -7,3 +7,6 @@ fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-k
 
 # Browser storage key name for the quarantined legacy queue (web/src/offline.ts line 10). Not a credential.
 7b9bddd84cd8622a406da354dfaf48461677d625:web/src/offline.ts:generic-api-key:10
+
+# Same reviewed false positive as above, after the outbox rewrite moved the quarantine key to line 11.
+30954a5206f1248c593a52a52438e6bd1e323edd:web/src/offline.ts:generic-api-key:11
