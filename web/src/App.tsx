@@ -6,7 +6,7 @@ import { AddMeal } from "./screens/AddMeal";
 import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
 import { localDay } from "./dates";
-import { flushQueue } from "./offline";
+import { flushQueue, quarantineLegacy } from "./offline";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
 type Tab = "today" | "week" | "settings";
@@ -30,13 +30,19 @@ export function App() {
       });
   }, [attempt]);
 
-  // Meals saved while offline are sent when the app opens, and again when the connection returns.
+  // Meals saved while offline are sent only for the account that saved them, and only once that
+  // account is signed in. Signing out or switching accounts stops this and sends nothing else.
+  const ownerId = profile !== null && typeof profile === "object" ? profile.id : null;
   useEffect(() => {
-    const flush = () => void flushQueue();
+    quarantineLegacy();
+  }, []);
+  useEffect(() => {
+    if (!ownerId) return;
+    const flush = () => void flushQueue(ownerId);
     flush();
     window.addEventListener("online", flush);
     return () => window.removeEventListener("online", flush);
-  }, []);
+  }, [ownerId]);
 
   // A renewal that fails anywhere in the app sends the user back to sign-in, instead of a dead end.
   useEffect(() => {
@@ -113,6 +119,7 @@ export function App() {
         <div key={screen.name === "today" ? `today-${screen.day}` : screen.name} className="screen">
           {screen.name === "today" && (
             <Today
+              owner={profile.id}
               day={screen.day}
               onDayChange={(day) => {
                 setJustSaved(false);
@@ -124,6 +131,7 @@ export function App() {
           )}
           {screen.name === "add" && (
             <AddMeal
+              owner={profile.id}
               day={screen.day}
               onDone={() => {
                 setJustSaved(true);
