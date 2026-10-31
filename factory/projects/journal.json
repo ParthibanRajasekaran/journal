@@ -1,0 +1,28 @@
+{
+  "project": "journal",
+  "_protected": "Gate commands and protected paths. A candidate run cannot change them; changes need owner review.",
+  "default_gate_timeout_s": 600,
+  "workspace_links": ["web/node_modules"],
+  "protected_paths": [
+    "factory/**",
+    "policy/**",
+    ".github/**",
+    ".claude/**",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "**/*.lock",
+    "**/package-lock.json",
+    "backend/app/auth/**",
+    "backend/app/routes/auth*.py",
+    "backend/migrations/**",
+    "docs/adr/**",
+    "docs/prd.md",
+    "docs/openapi.yaml",
+    ".env*"
+  ],
+  "gates": {
+    "web-typecheck": {"cwd": "web", "argv": ["npm", "run", "--silent", "typecheck"], "timeout": 300},
+    "web-unit": {"cwd": "web", "argv": ["npx", "vitest", "run"], "timeout": 300},
+    "web-build": {"cwd": "web", "argv": ["npm", "run", "--silent", "build"], "timeout": 600}
+  }
+}

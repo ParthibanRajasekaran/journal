@@ -49,3 +49,8 @@ hooks:
 # Web screens: type-check, unit tests, and a production build.
 web:
 	cd web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
+
+# Factory controller tests. Stdlib only; no model calls, no network writes.
+.PHONY: factory
+factory:
+	python3 -m unittest factory.tests.test_factory

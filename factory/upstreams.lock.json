@@ -1,0 +1,21 @@
+{
+  "_note": "Pins for upstream sources the factory design draws on. Verified only that each pinned commit exists on its default branch (git ls-remote, 31 Oct 2026). Their contents were not reviewed file by file in the bootstrap session, and no upstream code, installer or hook was copied or executed. Adopt a pattern only by a reviewed change that records its path and licence here.",
+  "sources": [
+    {
+      "name": "affaan-m/ECC",
+      "url": "https://github.com/affaan-m/ECC",
+      "pinned_commit": "b38be6a7f6350964d59328b52f0624e1d1d552d1",
+      "licence": "MIT (per build spec; not re-checked in this session)",
+      "adopted": ["capability evaluation idea", "cost reporting idea"],
+      "not_adopted": ["hooks manifest", "full configuration", "eval-harness execution (upstream says containment is absent)"]
+    },
+    {
+      "name": "obra/superpowers",
+      "url": "https://github.com/obra/superpowers",
+      "pinned_commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b",
+      "licence": "MIT (per build spec; not re-checked in this session)",
+      "adopted": ["verification before completion", "independent review separated from implementation", "scoped plans"],
+      "not_adopted": ["default skill set", "automatic installers"]
+    }
+  ]
+}

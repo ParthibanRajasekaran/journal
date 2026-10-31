@@ -1,0 +1,24 @@
+{
+  "id": "JRN-OUTBOX-001",
+  "title": "Account-safe offline meal capture",
+  "outcome": "A meal saved offline is kept for the account that saved it, is sent only while that account is signed in, is never reported saved when storage refuses it, and is removed when its account is deleted.",
+  "risk_class": "high",
+  "base_commit": "b5f296f8c9ca4bb209a9ad38ed72d17500ab9eb2",
+  "allowed_paths": ["web/src/offline.ts", "web/src/offline.test.ts", "web/src/App.tsx", "web/src/screens/AddMeal.tsx", "web/src/screens/Today.tsx", "web/src/screens/Settings.tsx"],
+  "protected_paths": [],
+  "acceptance": [
+    {"id": "AC-1", "text": "A meal queued by account A is never sent while account B is signed in."},
+    {"id": "AC-2", "text": "Only account A's queued meals are sent when A signs in again."},
+    {"id": "AC-3", "text": "A storage failure is reported as not saved and keeps the form contents."},
+    {"id": "AC-4", "text": "A response lost after the server saved a meal does not create a duplicate on retry."},
+    {"id": "AC-5", "text": "Two concurrent flushes do not send the same meal twice."},
+    {"id": "AC-6", "text": "A refused meal becomes a visible blocked entry and is not retried forever."},
+    {"id": "AC-7", "text": "A deleted account's queued meals are discarded and cannot be replayed."},
+    {"id": "AC-8", "text": "Legacy unowned queue entries are quarantined and never sent."}
+  ],
+  "verification": ["web-typecheck", "web-unit", "web-build"],
+  "budget_usd": 1.0,
+  "max_repairs": 2,
+  "specialists": ["privacy-reviewer", "quality-engineer"],
+  "data_policy": {"synthetic_only": true}
+}

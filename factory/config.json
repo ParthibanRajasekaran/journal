@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "factory_version": "0.1.0",
+  "_protected": "Changes to this file are refused by scope checks when made by a candidate run.",
+  "execution": {
+    "default_mode": "dry-run",
+    "live_requires_env": "FACTORY_ALLOW_LIVE",
+    "claude_binary": "claude",
+    "timeout_seconds": 900,
+    "use_bare_mode": false
+  },
+  "budget": {
+    "max_ticket_usd": 2.0,
+    "per_call_reserve_usd": 0.5,
+    "contingency_usd": 0.25,
+    "warn_fraction": 0.7
+  },
+  "limits": {
+    "max_repairs": 2
+  }
+}
