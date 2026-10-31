@@ -4,6 +4,7 @@ that the factory blocks, rather than reporting a commit as verified."""
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 
 from factory import state
@@ -115,6 +116,50 @@ class DirtyWorktrees(EvidenceIntegrity):
         result = controller.verify(run_id)
         self.assertFalse(result["passed"])
         self.assertIn("uncommitted", result["reason"])
+
+
+class StandaloneVerify(EvidenceIntegrity):
+    """R3: `verify` is an entry point of its own. A gate that writes to the candidate must not produce a
+    passing result there, even when the same gate was caught during the normal run."""
+
+    def _ready_run_with_mutating_gate(self):
+        mutating = {
+            **PROJECT,
+            "gates": {
+                **PROJECT["gates"],
+                "mutating": {
+                    "cwd": ".",
+                    "argv": [sys.executable, "-c", "open('app/feature.txt','w').write('changed by a gate\\n')"],
+                    "timeout": 30,
+                },
+            },
+        }
+        adapter = ScriptedAdapter([{"files": {"app/feature.txt": "good\n"}}], [APPROVE])
+        controller = self.controller(adapter)
+        run_id = controller.run(make_ticket())
+        self.assertEqual(self.ledger.get_run(run_id)["state"], state.READY)
+        # Point the stored ticket at the mutating gate; the candidate itself is unchanged.
+        ticket_path = self.repo / ".factory-local" / "runs" / run_id / "ticket.json"
+        stored = json.loads(ticket_path.read_text())
+        stored["verification"] = ["mutating"]
+        ticket_path.write_text(json.dumps(stored))
+        return run_id, self.controller_with(ScriptedAdapter([], []), mutating)
+
+    def test_standalone_verify_rejects_a_gate_that_changes_the_candidate(self):
+        run_id, verifier = self._ready_run_with_mutating_gate()
+        # Restore the candidate to its clean committed state, as in the review's reproduction.
+        workdir = verifier.workdir(run_id)
+        subprocess.run(["git", "checkout", "--", "app/feature.txt"], cwd=workdir, check=True)
+        result = verifier.verify(run_id)
+        self.assertFalse(result["passed"], result)
+        self.assertIn("changed during verification", result["reason"])
+
+    def test_standalone_verify_reports_the_mutated_worktree_it_left_behind(self):
+        run_id, verifier = self._ready_run_with_mutating_gate()
+        subprocess.run(["git", "checkout", "--", "app/feature.txt"], cwd=verifier.workdir(run_id), check=True)
+        verifier.verify(run_id)
+        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=verifier.workdir(run_id), capture_output=True, text=True).stdout
+        self.assertIn("app/feature.txt", dirty)
 
 
 class WorkspaceLinks(EvidenceIntegrity):

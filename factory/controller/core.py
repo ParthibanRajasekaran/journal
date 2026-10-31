@@ -14,6 +14,7 @@ from pathlib import Path
 from factory import gitops, state
 from factory.common import FactoryError, now, read_json, sha256_text, write_json
 from factory.controller.decision import decide
+from factory.evidence import EvidenceGuard
 from factory.gates import run_gate
 from factory.ledger import BudgetExceeded, DuplicateDispatch, Ledger
 from factory.locks import WorkspaceLock
@@ -172,22 +173,24 @@ class Controller:
             return self._verify(run_id)
 
     def _verify(self, run_id: str) -> dict:
+        """Standalone verification of a recorded candidate. Same integrity routine as the normal run."""
         run = self.ledger.get_run(run_id)
         if run["candidate_sha"] is None:
             raise FactoryError("run has no candidate commit to verify")
         workdir = self.workdir(run_id)
-        head = gitops.head(workdir)
-        if head != run["candidate_sha"]:
-            return {"run_id": run_id, "passed": False, "reason": "stale: workspace HEAD is not the candidate"}
         if run["config_hash"] != self.config_hash:
             return {"run_id": run_id, "passed": False, "reason": "stale: gate configuration changed"}
-        dirty = gitops.dirty_entries(workdir, self.links)
-        if dirty:
-            return {"run_id": run_id, "passed": False, "reason": "stale: worktree has uncommitted or untracked changes", "dirty": dirty}
+        guard = EvidenceGuard(workdir, self.links, expected_head=run["candidate_sha"])
+        if not guard.clean_to_start:
+            return {"run_id": run_id, "passed": False, "reason": "stale: " + "; ".join(guard.problems)}
         ticket = self._load_ticket(run_id)
         results = [self._gate(workdir, gid) for gid in ticket["verification"]]
+        problems = guard.finish()
+        if problems:
+            return {"run_id": run_id, "candidate_sha": run["candidate_sha"], "passed": False,
+                    "reason": "refused: " + "; ".join(problems), "gates": results}
         passed = all(r["passed"] for r in results)
-        return {"run_id": run_id, "candidate_sha": head, "passed": passed, "gates": results}
+        return {"run_id": run_id, "candidate_sha": run["candidate_sha"], "passed": passed, "gates": results}
 
     # Internals --------------------------------------------------------------------------------
 
@@ -352,7 +355,8 @@ class Controller:
             raise Blocked("; ".join(reasons))
 
     def _verify_candidate(self, run_id: str, ticket: dict, workdir: Path, base: str, lineage: str) -> dict:
-        before = gitops.snapshot(workdir, self.links)
+        guard = EvidenceGuard(workdir, self.links, expected_head=None)
+        before = guard.before
         candidate = before["head"]
         changed = gitops.changed_paths(workdir, base)
         violations = check_scope(
@@ -362,9 +366,8 @@ class Controller:
         )
         if not changed:
             violations.append("the candidate changes no files")
-        if before["dirty"]:
-            # Evidence is for a commit. Any uncommitted or untracked file means the tested tree is not that commit.
-            violations.append("worktree is not clean: " + "; ".join(entry.strip() for entry in before["dirty"]))
+        # Evidence is for a commit. Any uncommitted or untracked file means the tested tree is not that commit.
+        violations.extend(p for p in guard.problems if p.startswith("worktree has uncommitted"))
         gates: list[dict] = []
         review: dict | None = None
         if not violations:
@@ -385,10 +388,9 @@ class Controller:
                 "checked_acceptance": (result.payload or {}).get("checked_acceptance", []) if result.ok else [],
                 "findings": (result.payload or {}).get("findings", []) if result.ok else [],
             }
-        after = gitops.snapshot(workdir, self.links)
-        if after != before:
-            # Something changed the tree while gates or the reviewer ran. These results describe a state that is not the commit.
-            violations.append(f"candidate changed during verification (head {before['head'][:12]} -> {after['head'][:12]}, dirty {len(after['dirty'])})")
+        # Something changed the tree while gates or the reviewer ran. These results describe a state that is not the commit.
+        violations.extend(p for p in guard.finish() if p.startswith("candidate changed during verification"))
+        after = guard.after
         return {
             "run_id": run_id,
             "ticket_id": ticket["id"],
