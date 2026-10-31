@@ -4,6 +4,7 @@ Every query filters by the signed-in user. A meal that belongs to someone else i
 as not found, so the API does not reveal which IDs exist (ADR-006 authorization layer).
 """
 
+import re
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
@@ -141,8 +142,22 @@ async def create_meal(
     session: SessionDep,
     body: MealCreate,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    expected_account: Annotated[str | None, Header(alias="X-Journal-Expected-Account")] = None,
 ) -> dict[str, Any]:
     require_write(request, user_id)
+    if expected_account is not None:
+        # The client says which account it queued this meal for. The session that authenticates this
+        # request decides, before anything is read or written. A mismatch means the session changed
+        # (another tab, logout, a different sign-in), and nothing is saved.
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", expected_account):
+            raise HTTPException(
+                status_code=422, detail="X-Journal-Expected-Account must be an account id."
+            )
+        if expected_account != user_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This request was made for another account. Nothing was saved.",
+            )
     try:
         key = uuid.UUID(idempotency_key)
     except ValueError as exc:
