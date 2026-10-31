@@ -54,3 +54,8 @@ web:
 .PHONY: factory
 factory:
 	python3 -m unittest discover -s factory/tests -t . -p "test_*.py"
+
+# Native sign-in attempt model (proposal). SQLite-backed; see docs/factory/proposals/native-auth/DESIGN.md.
+.PHONY: native-proposal
+native-proposal:
+	python3 -m unittest discover -s docs/factory/proposals/native-auth -p "test_*.py"
