@@ -57,7 +57,8 @@ async def current_user_id(
         raise HTTPException(status_code=401, detail="Sign in required.") from exc
     # A valid token is not enough: its account must still exist. A deleted account's copied
     # token is refused here, before any read or write, so it never reaches a foreign-key failure.
-    # Deleted means deleted_at is set, as in the account routes, so a soft-deleted account is refused too.
+    # Deleted means deleted_at is set, as in the account routes.
+    # A soft-deleted account is refused too.
     exists = (
         await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
     ).scalar_one_or_none()

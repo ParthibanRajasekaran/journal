@@ -115,8 +115,8 @@ def test_a_deleted_account_cannot_persist_or_replay_into_a_newly_registered_acco
     client.cookies.set(ACCESS_COOKIE, old_cookie)
     stale = _body()
 
-    # The stale cookie identifies the deleted account, whatever id the request names, so it is refused as
-    # unauthenticated. This test does not depend on the expected-account header, which is not enforced on main.
+    # The stale cookie identifies the deleted account, whatever id the request names.
+    # So it is refused as unauthenticated, independent of the expected-account header.
     replay = _post(client, stale, new_account)
     assert replay.status_code == 401, replay.text
     own = _post(client, stale, old_account)
