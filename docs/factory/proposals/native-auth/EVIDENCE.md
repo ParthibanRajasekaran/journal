@@ -49,3 +49,13 @@ Nothing marked pending is claimed as working. The attempt design is supported by
 Google token behaviour is not.
 
 No row is a release claim. Passing a row shows evidence for a design decision, not that the app is approved.
+
+## Transport and device check (1 November 2026)
+
+| Claim | Environment | Status | Evidence |
+|---|---|---|---|
+| Native HTTP patch needed: a WebView cannot call the API cross-origin | Emulator `google_apis_playstore`, debug APK built with `CapacitorHttp` disabled, production API base compiled in | demonstrated | Screenshot shows "Journal can't be reached"; path `.factory-local/` is not used, screenshot in the verification scratch area |
+| Native HTTP patch fixes reachability | Same emulator, debug APK with `CapacitorHttp` enabled | demonstrated | Screenshot shows "Journal server: reachable" (read-only `GET /api/v1/health`) |
+| Google sign-in on device | — | pending | Needs your OAuth clients and account |
+| Phone (not emulator) run | — | pending | No phone attached |
+| iOS | — | pending | Simulator build blocked (Swift package resolution stall); no device |
