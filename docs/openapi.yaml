@@ -131,6 +131,142 @@ paths:
           $ref: '#/components/responses/Problem'
         '403':
           $ref: '#/components/responses/Problem'
+  /auth/native/attempts:
+    post:
+      tags:
+      - Auth
+      operationId: createNativeAttempt
+      summary: Start a native sign-in attempt. The secret stays on the device; the nonce goes to the Google SDK
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
+      security: []
+      responses:
+        '201':
+          description: Attempt created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeAttemptCreated'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+
+  /auth/native/attempts/cancel:
+    post:
+      tags:
+      - Auth
+      operationId: cancelNativeAttempt
+      summary: Cancel a pending attempt. Idempotent; a completed attempt is unchanged
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeAttemptRef'
+      responses:
+        '204':
+          description: Cancelled, or nothing to cancel
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+
+  /auth/native/complete:
+    post:
+      tags:
+      - Auth
+      operationId: completeNativeSignIn
+      summary: Complete one attempt with the ID token from the Google SDK. Verified against that attempt's nonce, then consumed in the same transaction as the session
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeComplete'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTokens'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+
+  /auth/native/refresh:
+    post:
+      tags:
+      - Auth
+      operationId: refreshNativeSession
+      summary: Rotate a native refresh token. Reuse of a rotated token revokes the family
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeRefresh'
+      responses:
+        '200':
+          description: Rotated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTokens'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+
+  /auth/native/logout:
+    post:
+      tags:
+      - Auth
+      operationId: logoutNative
+      summary: Revoke the refresh family of a native session
+      parameters:
+      - $ref: '#/components/parameters/JournalRequest'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeRefresh'
+      responses:
+        '204':
+          description: Signed out
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
   /auth/logout:
     post:
       tags:
@@ -757,6 +893,59 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    NativeAttemptCreated:
+      type: object
+      required: [attempt_secret, nonce, expires_in]
+      properties:
+        attempt_secret:
+          type: string
+          minLength: 20
+          maxLength: 128
+        nonce:
+          type: string
+        expires_in:
+          type: integer
+    NativeAttemptRef:
+      type: object
+      required: [attempt_secret]
+      properties:
+        attempt_secret:
+          type: string
+          minLength: 20
+          maxLength: 128
+    NativeComplete:
+      type: object
+      required: [attempt_secret, id_token]
+      properties:
+        attempt_secret:
+          type: string
+          minLength: 20
+          maxLength: 128
+        id_token:
+          type: string
+          minLength: 20
+          maxLength: 8192
+        adult:
+          type: boolean
+          default: false
+    NativeRefresh:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          minLength: 20
+          maxLength: 256
+    NativeTokens:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
     Problem:
       type: object
       required:
