@@ -1,8 +1,32 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { api, ApiError, EstimateItem, EstimateQuestion, Meal, SuppliedAnswer } from "../api";
+import { api, ApiError, EstimateItem, EstimateQuestion, Meal, NewMeal, SuppliedAnswer } from "../api";
 import { localDay, momentOf } from "../dates";
 import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
+import { enqueue } from "../offline";
+
+// The meal being typed is kept for this browser session, so a reload or a detour to add a key does
+// not lose it. It is cleared once the meal is saved or the user cancels.
+const DRAFT_KEY = "journal.add-draft";
+type Draft = { describing: string; name: string; time: string; mealType: Meal["meal_type"]; values: Values; manual: boolean };
+
+function readDraft(): Draft | null {
+  try {
+    const parsed: unknown = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null");
+    return parsed && typeof parsed === "object" ? (parsed as Draft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(draft: Draft | null): void {
+  try {
+    if (draft) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    else sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Storage can be blocked. The draft is then simply not kept.
+  }
+}
 import { Hourglass as HourglassIcon } from "lucide-react";
 
 interface Props {
@@ -26,17 +50,18 @@ const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g:
 
 // One path: describe, check the estimate, save. Numbers are typed only when asked for.
 export function AddMeal({ day, onDone, onCancel }: Props) {
-  const [name, setName] = useState("");
+  const [draft] = useState(readDraft);
+  const [name, setName] = useState(draft?.name ?? "");
   const [start] = useState(nowRounded);
-  const [mealType, setMealType] = useState<Meal["meal_type"]>(() => mealFor(start));
-  const [time, setTime] = useState(start);
-  const [values, setValues] = useState<Values>({ calories: "", protein_g: "", carbs_g: "", fat_g: "" });
-  const [manual, setManual] = useState(false);
+  const [mealType, setMealType] = useState<Meal["meal_type"]>(draft?.mealType ?? mealFor(start));
+  const [time, setTime] = useState(draft?.time ?? start);
+  const [values, setValues] = useState<Values>(draft?.values ?? { calories: "", protein_g: "", carbs_g: "", fat_g: "" });
+  const [manual, setManual] = useState(draft?.manual ?? false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const [describing, setDescribing] = useState("");
+  const [describing, setDescribing] = useState(draft?.describing ?? "");
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [needsKey, setNeedsKey] = useState(false);
   const [estimating, setEstimating] = useState(false);
@@ -49,6 +74,11 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
   const [announce, setAnnounce] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [replaceOk, setReplaceOk] = useState(false);
+
+  // Keep the draft up to date as the user types, so a reload brings it back.
+  useEffect(() => {
+    writeDraft({ describing, name, time, mealType, values, manual });
+  }, [describing, name, time, mealType, values, manual]);
   const nameRef = useRef<HTMLInputElement>(null);
   const questionsRef = useRef<HTMLDivElement>(null);
 
@@ -149,21 +179,30 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
     if (failure) return setError(failure);
     setError(null);
     setSaving(true);
+    const meal: NewMeal = {
+      client_id: crypto.randomUUID(),
+      meal_type: mealType,
+      // Stored as an exact moment, from the time picked in the user's own time zone.
+      eaten_at: momentOf(day, time),
+      name: name.trim(),
+      calories: Number(values.calories),
+      protein_g: Number(values.protein_g),
+      carbs_g: Number(values.carbs_g),
+      fat_g: Number(values.fat_g),
+      source: sourceFor(),
+    };
     try {
-      await api.createMeal({
-        client_id: crypto.randomUUID(),
-        meal_type: mealType,
-        // Stored as an exact moment, from the time picked in the user's own time zone.
-        eaten_at: momentOf(day, time),
-        name: name.trim(),
-        calories: Number(values.calories),
-        protein_g: Number(values.protein_g),
-        carbs_g: Number(values.carbs_g),
-        fat_g: Number(values.fat_g),
-        source: sourceFor(),
-      });
+      await api.createMeal(meal);
+      writeDraft(null);
       onDone();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        // No connection: keep the meal on this device and send it when back online.
+        enqueue(meal);
+        writeDraft(null);
+        onDone();
+        return;
+      }
       setError((err as Error).message);
     } finally {
       setSaving(false);
@@ -175,7 +214,10 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
 
   function cancel() {
     if (unsaved) setConfirmCancel(true);
-    else onCancel();
+    else {
+      writeDraft(null);
+      onCancel();
+    }
   }
 
   function macroFields() {
@@ -327,7 +369,16 @@ export function AddMeal({ day, onDone, onCancel }: Props) {
           <p>Discard this meal? What you typed will be lost.</p>
           <span className="meal-actions">
             <button type="button" onClick={() => setConfirmCancel(false)} autoFocus>Keep editing</button>
-            <button type="button" className="danger-solid" onClick={onCancel}>Discard</button>
+            <button
+              type="button"
+              className="danger-solid"
+              onClick={() => {
+                writeDraft(null);
+                onCancel();
+              }}
+            >
+              Discard
+            </button>
           </span>
         </div>
       ) : (

@@ -4,6 +4,7 @@ import { EditMeal } from "./EditMeal";
 import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 import { savedLine } from "../encouragement";
+import { readQueue } from "../offline";
 import { Hand, Heart, ThumbsUp, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -27,6 +28,14 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(savedNote);
+  // Meals waiting on this device to be sent once the connection is back.
+  const [waiting, setWaiting] = useState(() => readQueue().length);
+  useEffect(() => {
+    const refresh = () => setWaiting(readQueue().length);
+    window.addEventListener("online", refresh);
+    refresh();
+    return () => window.removeEventListener("online", refresh);
+  }, []);
   const [SavedIcon] = useState(() => SAVED_ICONS[Math.floor(Math.random() * SAVED_ICONS.length)]);
   const reduceMotion = useReducedMotion();
 
@@ -69,6 +78,12 @@ export function Today({ day, onDayChange, onAdd, savedNote }: Props) {
       </div>
 
       {error && summary && <p className="error" role="alert">{error}</p>}
+
+      {waiting > 0 && (
+        <p className="waiting-note" role="status">
+          {waiting === 1 ? "1 meal" : `${waiting} meals`} saved on this device, waiting to sync.
+        </p>
+      )}
 
       {showSaved && summary && (
         <motion.p

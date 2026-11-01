@@ -75,9 +75,9 @@ def client(app: FastAPI) -> Iterator[TestClient]:
         yield test_client
 
 
-def _start(client: TestClient) -> tuple[str, str]:
+def _start(client: TestClient, adult: bool = True) -> tuple[str, str]:
     """Run the start step and return (state, nonce) as Google would see them."""
-    response = client.get("/api/v1/auth/google/start")
+    response = client.get("/api/v1/auth/google/start", params={"adult": "1" if adult else "0"})
     assert response.status_code == 302
     query = parse_qs(urlparse(response.headers["location"]).query)
     return query["state"][0], query["nonce"][0]
@@ -338,3 +338,58 @@ def test_tables_are_empty_after_truncate(settings: Settings) -> None:
             return int(result.scalar_one())
 
     assert run(count) == 0
+
+
+# --- the 18+ confirmation is kept for the account ----------------------------------------
+
+
+def _user_adult_confirmed(sub: str) -> bool:
+    async def read(engine: AsyncEngine) -> bool:
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                text("SELECT adult_confirmed_at FROM users WHERE google_sub = :sub"), {"sub": sub}
+            )
+            return result.scalar_one() is not None
+
+    return run(read)
+
+
+def test_a_first_sign_in_without_the_confirmation_is_refused(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state, nonce = _start(client, adult=False)
+    response = _callback(
+        client,
+        state,
+        monkeypatch,
+        nonce=nonce,
+        id_token=make_id_token(sub="new-minor", nonce=nonce),
+    )
+    assert response.headers["location"] == "/?signin=adult"
+    assert client.get("/api/v1/me").status_code == 401
+
+
+def test_the_confirmation_is_recorded_once_and_not_asked_again(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state, nonce = _start(client, adult=True)
+    response = _callback(
+        client,
+        state,
+        monkeypatch,
+        nonce=nonce,
+        id_token=make_id_token(sub="adult-once", nonce=nonce),
+    )
+    assert response.status_code == 303
+    assert _user_adult_confirmed("adult-once")
+
+    client.cookies.clear()
+    state, nonce = _start(client, adult=False)
+    again = _callback(
+        client,
+        state,
+        monkeypatch,
+        nonce=nonce,
+        id_token=make_id_token(sub="adult-once", nonce=nonce),
+    )
+    assert again.headers["location"] == "/"

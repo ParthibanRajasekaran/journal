@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, Profile } from "./api";
+import { api, ApiError, Profile, SIGNED_OUT_EVENT } from "./api";
 import { SignIn } from "./screens/SignIn";
 import { Today } from "./screens/Today";
 import { AddMeal } from "./screens/AddMeal";
 import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
 import { localDay } from "./dates";
+import { flushQueue } from "./offline";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
 type Tab = "today" | "week" | "settings";
@@ -28,6 +29,21 @@ export function App() {
         setProfile(signedOut ? null : "error");
       });
   }, [attempt]);
+
+  // Meals saved while offline are sent when the app opens, and again when the connection returns.
+  useEffect(() => {
+    const flush = () => void flushQueue();
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, []);
+
+  // A renewal that fails anywhere in the app sends the user back to sign-in, instead of a dead end.
+  useEffect(() => {
+    const signedOut = () => setProfile(null);
+    window.addEventListener(SIGNED_OUT_EVENT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
+  }, []);
 
   // When the screen changes (for example after Save), move focus to its heading rather than the page top.
   const firstScreen = useRef(true);

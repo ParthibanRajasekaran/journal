@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { api, ApiError, Provider } from "../api";
 
 // Where each provider creates a key. We cannot fetch the key for the user: the provider only shows
@@ -33,8 +33,9 @@ export function KeyHelp({ onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const chosen = PROVIDERS.find((p) => p.id === provider) ?? null;
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  // The panel sits inside the Add meal form, so it must not be a form itself: nested forms send the
+  // Save click to the outer form and lose what the user typed.
+  async function save() {
     if (!chosen) return setError("Choose a provider first.");
     if (!agreed) return setError("Tick the box to confirm.");
     setSaving(true);
@@ -54,23 +55,34 @@ export function KeyHelp({ onSaved }: Props) {
       <p className="key-help-title">Connect your AI account to estimate meals</p>
       <p className="muted">Pick the account you already use. Create a key there, then paste it below. Journal stores it encrypted and never shows it again.</p>
 
+      <fieldset className="segment-set">
+        <legend>Which account do you use?</legend>
+        <div className="segments">
+          {PROVIDERS.map((p) => (
+            <label key={p.id} className={`segment ${provider === p.id ? "segment-on" : ""}`}>
+              <input
+                type="radio"
+                name="ai-account"
+                value={p.id}
+                checked={provider === p.id}
+                onChange={() => setProvider(p.id)}
+              />
+              <span>{p.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <div className="provider-buttons">
         {PROVIDERS.map((p) => (
-          <a
-            key={p.id}
-            className={`button provider-btn ${provider === p.id ? "chip-on" : ""}`}
-            href={p.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setProvider(p.id)}
-          >
+          <a key={p.id} className="button provider-btn" href={p.url} target="_blank" rel="noopener noreferrer">
             Get a {p.label} key ↗
           </a>
         ))}
       </div>
 
       {chosen && (
-        <form onSubmit={save} className="key-form">
+        <div className="key-form">
           <label htmlFor="key-paste">Paste your {chosen.label} key (starts with {chosen.prefix})</label>
           <input
             id="key-paste"
@@ -88,10 +100,15 @@ export function KeyHelp({ onSaved }: Props) {
             </span>
           </label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button type="submit" className="primary" disabled={saving || apiKey.trim().length === 0 || !agreed}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void save()}
+            disabled={saving || apiKey.trim().length === 0 || !agreed}
+          >
             {saving ? "Checking…" : "Save and estimate"}
           </button>
-        </form>
+        </div>
       )}
     </div>
   );

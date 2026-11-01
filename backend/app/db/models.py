@@ -59,6 +59,8 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(80))
     target_calories: Mapped[int | None] = mapped_column(Integer)
     target_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    # When the user confirmed they are 18 or older. Recorded once per account, at first sign-in.
+    adult_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # The buddy encouragement switch. On by default; off hides every encouragement element.
     encouragement_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()

@@ -7,5 +7,5 @@ export default defineConfig({
     // In development the API runs on port 8000. Requests under /api go there.
     proxy: { "/api": "http://127.0.0.1:8000" },
   },
-  test: { environment: "jsdom" },
+  test: { environment: "jsdom", include: ["src/**/*.test.ts"] },
 });

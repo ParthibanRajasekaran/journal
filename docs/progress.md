@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-29. This file is the checkpoint for planning work. Update it when a phase changes state. Agents and humans should read it before starting work.
+Last updated: 2026-10-31. This file is the checkpoint for planning work. Update it when a phase changes state. Agents and humans should read it before starting work.
 
 ## Phase status
 
@@ -21,14 +21,14 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 | 2 | Database and migrations: users and meals tables, Alembic, constraints | Done | Backend | 17 database tests on PostgreSQL 18; models and migrations checked for drift; PostgreSQL 18 runs on port 5433 (started by hand; it does not restart after reboot) |
 | 2 | Mobile and web shell (Capacitor) | Not started | | Blocked on ADR acceptance |
 | 3 | Eval set (150 labelled meals) | Not started | | Needed for ADR-005 drift gate |
-| 3 | Authentication (ADR-004) | Not started | | Needs Apple `biometryCurrentSet` spike first |
+| 3 | Authentication (ADR-004) | Web sign-in live: Google OAuth with PKCE, sessions with refresh, 18+ confirmation (client-side only). Biometric unlock not started | Backend, Web | Needs Apple `biometryCurrentSet` spike before the mobile part. Server-side 18+ record is not built |
 
 ## Open decisions (blocking acceptance)
 
 1. **Default AI provider.** Gemini free tier may use meal content to improve Google products (ADR-005, ADR-006). Options: paid or no-training Gemini as default; free Gemini behind explicit training acknowledgement; or OpenAI or Anthropic default. Owner: product. Affects PRD section 11 and FR-7.
 2. **Estimate schema.** ADR-001 uses `calories` and numeric `confidence`. ADR-005 uses `calories_kcal` and `low|medium|high`. Neither has `is_food`. Pick one set and update both ADRs.
 3. **EU transfer basis and Article 9 status.** Counsel to confirm the transfer mechanism for US AI providers and whether meal and photo data is special-category health data.
-4. **Refresh-token lifetime (90 days) and re-auth window (5 min).** Proposed in ADR-004. Confirm.
+4. **Refresh-token lifetime (90 days) and re-auth window (5 min).** Proposed in ADR-004. The code currently uses 30 days (`refresh_token_ttl_days`). Confirm which value to keep.
 5. **Hosting target.** Decided: Oracle Always Free (ADR-007). Account created with home region UK South (London), accepted by owner; counsel must confirm it for EU users. Instance not yet created.
 6. **Client approach.** Capacitor hybrid (ADR-003) versus native. See `docs/client-architecture.md`.
 
@@ -54,3 +54,9 @@ Last updated: 2026-10-29. This file is the checkpoint for planning work. Update 
 - Disk alert: `ops/disk-check.sh` runs hourly. Notifies through ntfy when the root disk passes 80%. Subscribe to the topic on the owner's phone.
 - Edge protection: Cloudflare proxy deferred. The DNS would need to move from Vercel to Cloudflare. Revisit before public launch.
 - Open: the AI provider decision (bring-your-own-key design is written up in chat, not yet built).
+
+## Test counts (2026-10-31)
+
+- Backend: 247 tests passing, coverage 91.7% (gate minimum 90%).
+- Web unit: 37 tests passing.
+- Browser (live site): 22 passing, 8 skipped until a test-account session exists (`E2E_STORAGE_STATE`).

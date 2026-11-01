@@ -105,16 +105,25 @@ export type EstimateReply =
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
 const BASE = "/api/v1";
 
+// Shown when the connection drops, so no raw browser message reaches the user.
+export const OFFLINE_MESSAGE = "Can't reach Journal right now. Check your connection, then try again.";
+// Raised when the session can no longer be renewed. The app listens and returns to sign-in.
+export const SIGNED_OUT_EVENT = "journal:signed-out";
+
 async function send(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<Response> {
   const headers: Record<string, string> = { ...extra };
   if (method !== "GET") Object.assign(headers, CSRF_HEADER);
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  return fetch(BASE + path, {
-    method,
-    credentials: "include",
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  try {
+    return await fetch(BASE + path, {
+      method,
+      credentials: "include",
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, OFFLINE_MESSAGE);
+  }
 }
 
 // The access cookie lasts 15 minutes. One refresh is shared by every request that needs it: the
@@ -132,8 +141,12 @@ function refreshSession(): Promise<boolean> {
 
 async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
   let response = await send(method, path, body, extra);
-  if (response.status === 401 && !path.startsWith("/auth/") && (await refreshSession())) {
-    response = await send(method, path, body, extra);
+  if (response.status === 401 && !path.startsWith("/auth/")) {
+    if (await refreshSession()) {
+      response = await send(method, path, body, extra);
+    } else if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+    }
   }
   if (response.status === 204) return undefined as T;
   if (!response.ok) {

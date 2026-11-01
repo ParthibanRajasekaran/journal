@@ -69,7 +69,9 @@ def user_id_from_access_token(token: str, key: str) -> str:
     return str(claims["sub"])
 
 
-def issue_state_token(state: str, nonce: str, verifier: str, key: str, ttl_seconds: int) -> str:
+def issue_state_token(
+    state: str, nonce: str, verifier: str, key: str, ttl_seconds: int, *, adult: bool = False
+) -> str:
     now = datetime.now(UTC)
     return _encode(
         {
@@ -77,6 +79,7 @@ def issue_state_token(state: str, nonce: str, verifier: str, key: str, ttl_secon
             "state": state,
             "nonce": nonce,
             "verifier": verifier,
+            "adult": adult,
             "exp": now + timedelta(seconds=ttl_seconds),
         },
         key,
@@ -87,7 +90,9 @@ def read_state_token(token: str, key: str) -> dict[str, str]:
     claims = _decode(token, key)
     if claims.get("typ") != STATE_TYPE:
         raise AuthError("not a sign-in state token")
-    return {name: str(claims[name]) for name in ("state", "nonce", "verifier")}
+    result = {name: str(claims[name]) for name in ("state", "nonce", "verifier")}
+    result["adult"] = "1" if claims.get("adult") is True else "0"
+    return result
 
 
 def new_opaque_token() -> str:
