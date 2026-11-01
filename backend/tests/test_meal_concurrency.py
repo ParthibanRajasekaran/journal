@@ -1,8 +1,9 @@
-"""Concurrent creates with one owner and one client_id, against the real PostgreSQL test database.
+"""Concurrent creates with one owner and one client_id, on the real PostgreSQL test database.
 
-Each thread sends at the same moment, behind a barrier, so the unique constraint on (user, client_id)
-is really raced. Whatever the timing, exactly one meal is stored, and every response matches the
-documented results: the same meal is a replay (200 or 201), a different meal is a conflict (409).
+Each thread sends at the same moment, behind a barrier, so the unique constraint on
+(user, client_id) is really raced. Whatever the timing, exactly one meal is stored.
+Every response matches the documented results: the same meal is a replay (200 or 201),
+and a different meal is a conflict (409).
 """
 
 import threading

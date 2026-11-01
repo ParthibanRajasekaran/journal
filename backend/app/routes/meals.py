@@ -217,7 +217,9 @@ async def create_meal(
         if winner is None:
             raise HTTPException(status_code=409, detail="Retry the request.") from exc
         if not _same_content(winner, body):
-            raise HTTPException(status_code=409, detail="This key was used for a different meal.") from exc
+            raise HTTPException(
+                status_code=409, detail="This key was used for a different meal."
+            ) from exc
         response.status_code = 200
         return _meal_out(winner)
     await session.refresh(meal)

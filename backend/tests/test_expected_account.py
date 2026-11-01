@@ -205,8 +205,8 @@ def test_two_tabs_sending_the_same_meal_store_one_meal(
 def test_re_registration_after_deletion_gets_a_new_account_and_refuses_the_old_queue(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # A deleted account's queued meal must never land on a later account, even one that signs in with the
-    # same Google subject again.
+    # A deleted account's queued meal must never land on a later account, even one that signs in
+    # with the same Google subject again.
     owner_a = _sign_in_as(client, monkeypatch, "sub-a")
     assert client.delete("/api/v1/me", headers=CSRF).status_code == 204
 
