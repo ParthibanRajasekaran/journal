@@ -1,7 +1,8 @@
 # Narrow authorisation for the outbox milestone: `web/src/` only
 
-Status: proposal. **Not approved.** Nothing in this file records your approval. You approve by making the change
-yourself, on `main`, through your own pull request or a direct commit, with your own name.
+Status: **approved by the owner** (ParthibanRajasekaran), recorded in `docs/factory/policy-exceptions.json` with the same
+scope as below. The approval takes effect for the factory and checker only once that change is on `main`, because they read
+the approvals file at the base commit.
 
 ## Why this scope
 
