@@ -115,11 +115,10 @@ def test_a_deleted_account_cannot_persist_or_replay_into_a_newly_registered_acco
     client.cookies.set(ACCESS_COOKIE, old_cookie)
     stale = _body()
 
-    # Replay of the queued write under the new account: refused, and nothing is stored for either.
+    # The stale cookie identifies the deleted account, whatever id the request names, so it is refused as
+    # unauthenticated. This test does not depend on the expected-account header, which is not enforced on main.
     replay = _post(client, stale, new_account)
-    assert replay.status_code in (401, 409), replay.text
-    assert replay.status_code != 201
-    # The deleted account's own id: refused as unauthenticated, never a retryable conflict.
+    assert replay.status_code == 401, replay.text
     own = _post(client, stale, old_account)
     assert own.status_code == 401, own.text
     assert run(lambda engine: _rows_for(engine, stale["client_id"])) == 0
