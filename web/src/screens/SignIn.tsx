@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import { nativeAuth } from "../native";
 import { SignInCancelled } from "../native/auth";
 import { isNativePlatform, nativeSignInConfigured } from "../native/platform";
@@ -34,8 +34,20 @@ export function SignIn({ onSignedIn }: { onSignedIn?: () => void }) {
   const [remembered, setRemembered] = useState(readDeviceFlag);
   const [ticked, setTicked] = useState(false);
   const adult = remembered || ticked;
-  // On a phone the Google sheet opens in the platform's own UI, through the SDK. In a browser the redirect is used.
   const onDevice = isNativePlatform();
+  const [server, setServer] = useState<string>("checking");
+  useEffect(() => {
+    if (!onDevice) return;
+    let cancelled = false;
+    api
+      .health()
+      .then(() => !cancelled && setServer("reachable"))
+      .catch((err: unknown) => !cancelled && setServer(err instanceof ApiError ? `unreachable: ${err.message}` : "unreachable"));
+    return () => {
+      cancelled = true;
+    };
+  }, [onDevice]);
+  // On a phone the Google sheet opens in the platform's own UI, through the SDK. In a browser the redirect is used.
   const native = onDevice && nativeSignInConfigured();
 
   async function signInNatively() {
@@ -98,6 +110,11 @@ export function SignIn({ onSignedIn }: { onSignedIn?: () => void }) {
           </label>
         )}
 
+        {onDevice && (
+          <p className="muted fine-print" data-testid="server-status">
+            Journal server: {server}
+          </p>
+        )}
         {onDevice && !native && (
           <p className="error" role="alert">
             Sign-in isn't set up in this build yet. Google sign-in on a phone uses the phone's own sign-in

@@ -192,6 +192,8 @@ async function request<T>(method: string, path: string, body?: unknown, extra?: 
 
 export const api = {
   signInUrl: `${BASE}/auth/google/start`,
+  // Read-only reachability check. It sends no credentials and changes nothing on the server.
+  health: () => request<{ status: string }>("GET", "/health"),
   me: () => request<Profile>("GET", "/me"),
   // A target set to null is cleared.
   updateMe: (patch: {
