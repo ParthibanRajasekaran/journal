@@ -16,3 +16,6 @@ fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-k
 
 # Same reviewed storage-key false positive, in the outbox candidate commit 8a4d74f (line 11).
 8a4d74f6a3943fbfcf439338f83411c5e5b50e17:web/src/offline.ts:generic-api-key:11
+
+# Historical only: a plainly fake attempt value in the native sign-in test fixture (commit 00a00a1, web/src/native/auth.test.ts line 10). The value was renamed in 95f1006; history is not rewritten.
+00a00a1e377144f1b0c7619f4a56058ea9d3dced:web/src/native/auth.test.ts:generic-api-key:10
