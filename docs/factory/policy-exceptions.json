@@ -6,5 +6,15 @@
       "approved_by": "ParthibanRajasekaran",
       "reason": "Outbox milestone: account-safe offline capture. Scope limited to web/src/ only. Excludes web/e2e, web/android, web/ios, factory/, policy/, and this approvals file. Owner approval given in the owner's instruction in this session ('I also approve the narrow web/src/ authorization described in PR #5 ... approved_by: ParthibanRajasekaran and status: approved')."
     }
+  ],
+  "protected_file_exceptions": [
+    {
+      "path": "docs/openapi.yaml",
+      "diff_sha256": "d8ba93496b749a6996b1365751c8a8d621f2109cd8f139d5bde6db728aa05a60",
+      "ticket_id": "JRN-OUTBOX-001",
+      "status": "pending-owner-approval",
+      "approved_by": "",
+      "reason": "Reusable for the identical diff until retired; bound to ticket JRN-OUTBOX-001. Covers only the diff of docs/openapi.yaml between main and the outbox candidate that adds the X-Journal-Expected-Account header parameter and its component, documenting the server's 409 refusal. Any other change to this file stays refused. Retire by changing or removing this entry on main. The digest is SHA-256 of git diff with literal pathspecs, full index ids, a/ and b/ prefixes and no rename detection, between base and head, for docs/openapi.yaml."
+    }
   ]
 }
