@@ -4,8 +4,8 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, api } from "../api";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { ApiError, api, type Meal } from "../api";
 import { readStoredAttempt } from "../attempt";
 import { readQueue } from "../offline";
 import { AddMeal } from "./AddMeal";
@@ -23,8 +23,8 @@ const OFFLINE = "Can't reach Journal right now. Check your connection, then try 
 
 let container: HTMLDivElement;
 let root: Root;
-let onDone: ReturnType<typeof vi.fn>;
-let onCancel: ReturnType<typeof vi.fn>;
+let onDone: Mock<() => void>;
+let onCancel: Mock<() => void>;
 
 // A manual draft, so Save is enabled without an estimate.
 function seedManualDraft(): void {
@@ -60,7 +60,7 @@ function clickButton(label: RegExp): void {
 }
 
 // Each call to createMeal is held open until the test settles it.
-type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void; clientId: string };
+type Pending = { resolve: (v: Meal) => void; reject: (e: unknown) => void; clientId: string };
 const pending: Pending[] = [];
 function holdSaves(): void {
   vi.mocked(api.createMeal).mockImplementation(
@@ -76,7 +76,7 @@ async function settle(outcome: "lost" | "server-error" | "ok"): Promise<void> {
   await act(async () => {
     if (outcome === "lost") next.reject(new ApiError(0, OFFLINE));
     else if (outcome === "server-error") next.reject(new ApiError(500, "Server error"));
-    else next.resolve({});
+    else next.resolve({} as Meal);
     await Promise.resolve();
   });
 }
@@ -87,8 +87,8 @@ beforeEach(() => {
   pending.length = 0;
   vi.mocked(api.createMeal).mockReset();
   holdSaves();
-  onDone = vi.fn();
-  onCancel = vi.fn();
+  onDone = vi.fn<() => void>();
+  onCancel = vi.fn<() => void>();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -164,5 +164,14 @@ describe("Cancel and Discard during an in-flight save", () => {
     clickButton(/Discard/);
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(readStoredAttempt(OWNER)).toBeNull();
+
+    // Leaving unmounts the form in the app. Entering the same meal again is a new visit: a new form, the same draft.
+    act(() => root.unmount());
+    root = createRoot(container);
+    seedManualDraft();
+    mount();
+    clickButton(/Save meal/);
+    expect(pending[0].clientId).not.toBe(first);
+    await settle("ok");
   });
 });
