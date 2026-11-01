@@ -16,8 +16,12 @@ What it cannot do:
 - It never exempts a path the ticket does not allow.
 
 Approvals are read from the base commit, so a candidate cannot approve its own change. Malformed approval data raises
-FactoryError, which stops the run. Entries that are unapproved, unnamed, for another ticket, or with a malformed digest
-are ignored.
+FactoryError, which stops the run, including an approved entry whose digest is malformed. Entries that are unapproved,
+unnamed, or for another ticket are ignored.
+
+The digest pins the git settings that change diff output (see diff_digest). Attribute-driven drivers from a repository's
+.gitattributes or a local attributes file are not pinned; a candidate whose file uses one fails closed, because its digest
+will not match the owner's.
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 from factory import gitops
@@ -63,8 +68,9 @@ def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -
             continue
         if not (isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip()):
             continue
+        # An approved entry with a malformed digest is an error, not a silent no-op.
         if not (isinstance(path, str) and isinstance(digest, str) and _DIGEST.match(digest)):
-            continue
+            raise FactoryError(f"approved entry for {path!r} has a malformed diff_sha256 at {base[:12]}")
         if path == APPROVALS_PATH:
             continue
         # An entry may name one ticket. Such an entry never applies to another ticket.
@@ -82,17 +88,23 @@ def diff_digest(repo: Path, base: str, head: str, path: str) -> str:
     The options are pinned, so the digest does not depend on local git configuration: literal pathspecs, no textconv,
     a fixed diff algorithm and context, full object ids, fixed a/ and b/ prefixes, and no rename detection. The owner computes the digest with this same function.
     """
-    text = gitops.git(
-        repo,
-        "--literal-pathspecs",
-        "-c", "diff.noprefix=false",
-        "-c", "diff.mnemonicPrefix=false",
-        "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--full-index",
-        "--diff-algorithm=myers", "--unified=3", "--inter-hunk-context=0",
-        "--src-prefix=a/", "--dst-prefix=b/", "--no-renames",
-        base, head, "--", path,
+    result = subprocess.run(
+        [
+            "git", "--literal-pathspecs",
+            "-c", "diff.noprefix=false",
+            "-c", "diff.mnemonicPrefix=false",
+            "-c", "core.quotePath=true",
+            "-c", "diff.suppressBlankEmpty=false",
+            "-c", "diff.relative=false",
+            "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--full-index",
+            "--diff-algorithm=myers", "--unified=3", "--inter-hunk-context=0",
+            "--indent-heuristic", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames",
+            base, head, "--", path,
+        ],
+        cwd=repo, check=True, capture_output=True,
     )
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    # Hashed as bytes: no decoding, so a non-UTF-8 byte in the diff cannot crash the run, and no newline translation.
+    return hashlib.sha256(result.stdout).hexdigest()
 
 
 def exempted_paths(

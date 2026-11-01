@@ -168,8 +168,13 @@ class FailClosed(unittest.TestCase):
         base = self.base_with(approvals([self.entry(path=APPROVALS)]))
         self.assertEqual(approved_file_digests(self.repo, base), {})
 
-    def test_a_malformed_digest_is_ignored(self) -> None:
+    def test_an_approved_entry_with_a_malformed_digest_stops_the_run(self) -> None:
         base = self.base_with(approvals([self.entry(diff_sha256="not-a-digest")]))
+        with self.assertRaises(FactoryError):
+            approved_file_digests(self.repo, base)
+
+    def test_an_unapproved_entry_with_a_malformed_digest_is_ignored(self) -> None:
+        base = self.base_with(approvals([self.entry(diff_sha256="not-a-digest", status="pending-owner-approval")]))
         self.assertEqual(approved_file_digests(self.repo, base), {})
 
     def test_status_is_matched_exactly(self) -> None:
