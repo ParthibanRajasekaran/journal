@@ -1,5 +1,10 @@
 // Native sign-in orchestration. Dependencies are injected, so the rules can be tested without a device.
 // See docs/factory/proposals/native-auth/DESIGN.md for the contract this follows.
+//
+// Stale operations: every sign-in and every sign-out advances a generation. A refresh or sign-in that started
+// earlier may finish later. When it does, it must not store tokens or touch the device's state. If it obtained
+// tokens, those tokens are revoked on the server, so no session exists that the device does not hold.
+// All device-storage writes go through one queue, and each re-checks the generation when it runs.
 import { nativeBridge, type NativeBridge } from "./bridge";
 
 export const USER_CANCELLED = "USER_CANCELLED";
@@ -37,46 +42,84 @@ export class SignInCancelled extends Error {
   }
 }
 
+// A sign-in that was overtaken by sign-out or by a newer sign-in. Its outcome is discarded.
+export class SignInSuperseded extends Error {
+  constructor() {
+    super("This sign-in was replaced by a newer one, or by sign-out.");
+  }
+}
+
 function statusOf(err: unknown): number | undefined {
   return typeof err === "object" && err !== null && "status" in err ? (err as { status: number }).status : undefined;
 }
 
 export function createNativeAuth(deps: NativeDeps, bind: NativeBridge = nativeBridge) {
-  // One refresh at a time. The server rotates refresh tokens, so two refreshes would look like reuse.
-  let inflight: Promise<boolean> | null = null;
+  let generation = 0;
+  let inflight: { gen: number; promise: Promise<boolean> } | null = null;
 
-  async function keep(tokens: TokenResponse): Promise<void> {
-    bind.accessToken = tokens.access_token;
-    await deps.storage.set(tokens.refresh_token);
+  // One queue for device-storage writes, so a later operation's write cannot be overtaken by an earlier one.
+  let queue: Promise<unknown> = Promise.resolve();
+  function serial<T>(task: () => Promise<T>): Promise<T> {
+    const run = queue.then(task, task);
+    queue = run.catch(() => undefined);
+    return run;
+  }
+
+  const current = (gen: number) => gen === generation;
+
+  async function revokeQuietly(refreshToken: string): Promise<void> {
+    await deps.logout(refreshToken).catch(() => undefined);
+  }
+
+  // Keeps tokens only if this operation is still the current one. Otherwise the new session is revoked.
+  function keepIfCurrent(gen: number, tokens: TokenResponse): Promise<boolean> {
+    return serial(async () => {
+      if (!current(gen)) {
+        await revokeQuietly(tokens.refresh_token);
+        return false;
+      }
+      bind.accessToken = tokens.access_token;
+      await deps.storage.set(tokens.refresh_token);
+      return true;
+    });
   }
 
   function refreshOnce(): Promise<boolean> {
-    inflight ??= (async () => {
-      const stored = await deps.storage.get();
+    if (inflight && inflight.gen === generation) return inflight.promise;
+    const gen = generation;
+    const promise = (async () => {
+      const stored = await serial(() => deps.storage.get());
       if (!stored) {
-        bind.accessToken = null;
+        if (current(gen)) bind.accessToken = null;
         return false;
       }
       try {
-        await keep(await deps.refresh(stored));
-        return true;
+        const tokens = await deps.refresh(stored);
+        return await keepIfCurrent(gen, tokens);
       } catch (err) {
-        if (statusOf(err) === 401) {
+        if (current(gen) && statusOf(err) === 401) {
           // The server refused the refresh token: the session is over, so the stored copy is removed.
           bind.accessToken = null;
-          await deps.storage.remove();
+          await serial(() => deps.storage.remove());
         }
-        // Any other failure (no connection) keeps the stored token, so the next launch can try again.
+        // A stale operation changes nothing. Any other failure (no connection) keeps the stored token.
         return false;
       }
     })().finally(() => {
-      inflight = null;
+      if (inflight && inflight.promise === promise) inflight = null;
     });
-    return inflight;
+    inflight = { gen, promise };
+    return promise;
   }
 
   async function signIn(adult: boolean): Promise<void> {
+    const gen = ++generation;
+    inflight = null;
     const attempt = await deps.createAttempt();
+    if (!current(gen)) {
+      await deps.cancelAttempt(attempt.attempt_secret).catch(() => undefined);
+      throw new SignInSuperseded();
+    }
     let idToken: string;
     try {
       idToken = await deps.googleLogin(attempt.nonce);
@@ -88,16 +131,25 @@ export function createNativeAuth(deps: NativeDeps, bind: NativeBridge = nativeBr
       }
       throw err;
     }
-    await keep(await deps.complete(attempt.attempt_secret, idToken, adult));
+    if (!current(gen)) {
+      await deps.cancelAttempt(attempt.attempt_secret).catch(() => undefined);
+      throw new SignInSuperseded();
+    }
+    const tokens = await deps.complete(attempt.attempt_secret, idToken, adult);
+    if (!(await keepIfCurrent(gen, tokens))) throw new SignInSuperseded();
   }
 
   async function signOut(): Promise<void> {
-    const stored = await deps.storage.get();
+    generation += 1;
+    inflight = null;
     bind.accessToken = null;
-    await deps.storage.remove();
-    // The local session is cleared first. The server revocation is best effort: a failure here cannot keep
-    // the device signed in.
-    if (stored) await deps.logout(stored).catch(() => undefined);
+    const stored = await serial(async () => {
+      const previous = await deps.storage.get();
+      await deps.storage.remove();
+      return previous;
+    });
+    // The device is cleared first. The server revocation is best effort: a failure cannot keep the device signed in.
+    if (stored) await revokeQuietly(stored);
   }
 
   function register(): void {
