@@ -103,7 +103,9 @@ export type EstimateReply =
     };
 
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
-const BASE = "/api/v1";
+// Empty for the web build, which is served by the API. Native builds set VITE_API_BASE to the
+// HTTPS origin of the backend, for example https://journal.example.
+const BASE = `${import.meta.env.VITE_API_BASE ?? ""}/api/v1`;
 
 // Shown when the connection drops, so no raw browser message reaches the user.
 export const OFFLINE_MESSAGE = "Can't reach Journal right now. Check your connection, then try again.";
@@ -139,10 +141,19 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+// Raised instead of sending when the session now belongs to another account. Nothing is sent.
+export const STALE_SESSION = "The signed-in account changed. This request was not sent.";
+// The server's answer when a write names an account that the session no longer belongs to.
+export const OTHER_ACCOUNT = "This request was made for another account. Nothing was saved.";
+
+// `guard` is checked before the first send and again before any resend after a refresh. A request
+// made for one account is never replayed on another account's session.
+async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>, guard?: () => boolean): Promise<T> {
+  if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
   let response = await send(method, path, body, extra);
   if (response.status === 401 && !path.startsWith("/auth/")) {
     if (await refreshSession()) {
+      if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
       response = await send(method, path, body, extra);
     } else if (typeof window !== "undefined") {
       window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
@@ -178,8 +189,16 @@ export const api = {
   day: (date: string, tz: string) => request<DaySummary>("GET", `/days/${date}?tz=${encodeURIComponent(tz)}`),
   week: (start: string, tz: string) => request<Totals[]>("GET", `/week?start=${start}&tz=${encodeURIComponent(tz)}`),
 
-  createMeal: (meal: NewMeal) =>
-    request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),
+  // `expectedAccount` names the account the write was made for. The server refuses the write, and saves
+  // nothing, when the session belongs to a different account. A client check alone cannot prevent this.
+  createMeal: (meal: NewMeal, guard?: () => boolean, expectedAccount?: string) =>
+    request<Meal>(
+      "POST",
+      "/meals",
+      meal,
+      { "Idempotency-Key": meal.client_id, ...(expectedAccount ? { "X-Journal-Expected-Account": expectedAccount } : {}) },
+      guard,
+    ),
   updateMeal: (meal: Pick<Meal, "id" | "version">, patch: Partial<Omit<NewMeal, "client_id" | "source">>) =>
     request<Meal>("PATCH", `/meals/${meal.id}`, patch, { "If-Match": String(meal.version) }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),

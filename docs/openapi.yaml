@@ -385,6 +385,7 @@ paths:
       - &id004
         $ref: '#/components/parameters/JournalRequest'
       - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/ExpectedAccount'
       requestBody:
         required: true
         content:
@@ -725,6 +726,14 @@ components:
         type: string
         enum:
         - '1'
+    ExpectedAccount:
+      name: X-Journal-Expected-Account
+      in: header
+      required: false
+      description: Optional. The account id the client queued this write for. If the authenticated session belongs to a different account, the server refuses with 409 and saves nothing. Use it for queued writes, where the session may have changed since the write was made.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{1,64}$'
     IdempotencyKey:
       name: Idempotency-Key
       in: header
