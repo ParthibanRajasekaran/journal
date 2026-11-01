@@ -284,16 +284,42 @@ export function discardAccountDurably(owner: string): DiscardResult {
 export function retryPendingDiscard(): boolean {
   const owed = readDiscardOwners();
   if (owed === null) return false;
+  // Every account still owed: those in the stored record, and those whose record could not be written.
+  const all = [...new Set([...owed, ...unrecordedCleanup])];
+  let remaining = [...owed];
   let clean = true;
-  for (const owner of owed) {
+  for (const owner of all) {
     if (discardOwner(owner).ok) {
-      writeDiscardOwners(readDiscardOwners()?.filter((o) => o !== owner) ?? []);
+      remaining = remaining.filter((o) => o !== owner);
       unrecordedCleanup.delete(owner);
     } else {
       clean = false;
     }
   }
+  // Written from the snapshot taken above. A failed write leaves the record listing accounts that are
+  // already clean, which is harmless: their removal finds nothing to do.
+  if (!writeDiscardOwners(remaining)) clean = false;
   return clean;
+}
+
+// Reads the outbox without writing anything. Rendering must not change storage, so this never quarantines
+// or dispatches an event. Null means the outbox cannot be read.
+function peekOutboxEntries(): OutboxEntry[] | null {
+  const store = storage();
+  if (!store) return null;
+  let raw: string | null;
+  try {
+    raw = store.getItem(OUTBOX_KEY);
+  } catch {
+    return null;
+  }
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isEntry) : null;
+  } catch {
+    return null;
+  }
 }
 
 // What the sign-in screen must say about this device's data for deleted accounts.
@@ -303,7 +329,8 @@ export type DeviceCleanup = "none" | "pending" | "unrecorded";
 export function pendingDeviceCleanup(): DeviceCleanup {
   const owed = readDiscardOwners();
   if (owed === null || unrecordedCleanup.size > 0) return "unrecorded";
-  const { entries } = readOutbox();
+  const entries = peekOutboxEntries();
+  if (entries === null) return "unrecorded";
   if (owed.some((owner) => entries.some((e) => e.owner === owner))) return "pending";
   // A record whose meals are gone is stale. It is removed on the next start, and nothing is pending.
   return "none";
@@ -352,18 +379,20 @@ function update(owner: string, clientId: string, change: (e: OutboxEntry) => Out
 }
 
 // Schedules the next pass for an account after a transient failure. One timer per account.
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const timers = new Map<string, { due: number; handle: ReturnType<typeof setTimeout> }>();
 // The retry uses the same sender as the failed attempt, so a retry never goes somewhere else.
+// Keeps the earliest due time. A later request never delays a retry that is already armed sooner.
 function scheduleRetry(owner: string, delay: number, send: SendMeal): void {
   if (typeof window === "undefined") return;
-  clearTimeout(timers.get(owner));
-  timers.set(
-    owner,
-    setTimeout(() => {
-      timers.delete(owner);
-      void flushQueue(owner, send);
-    }, delay),
-  );
+  const due = Date.now() + delay;
+  const existing = timers.get(owner);
+  if (existing && existing.due <= due) return;
+  if (existing) clearTimeout(existing.handle);
+  const handle = setTimeout(() => {
+    timers.delete(owner);
+    void flushQueue(owner, send);
+  }, delay);
+  timers.set(owner, { due, handle });
 }
 
 async function sendPending(owner: string, send: SendMeal): Promise<number> {
@@ -381,6 +410,10 @@ async function sendPending(owner: string, send: SendMeal): Promise<number> {
     }
     // Check before every send: the session may have changed while an earlier request was in flight.
     if (!stillOwner()) break;
+    // The meal may have been discarded while this pass was running.
+    const current = peekOutboxEntries();
+    if (current === null) break;
+    if (!current.some((e) => e.owner === owner && e.meal.client_id === entry.meal.client_id)) continue;
     try {
       await send(entry.meal, stillOwner, owner);
     } catch (err) {

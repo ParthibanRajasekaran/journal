@@ -278,3 +278,31 @@ describe("two deletions on one device", () => {
     expect(pendingDeviceCleanup()).toBe("none");
   });
 });
+
+// Delta re-review: a failed re-read must never erase another owed account, and rendering must not write.
+describe("delta re-review regressions", () => {
+  it("a retry that cannot finish keeps every other owed account", () => {
+    enqueue(A, meal("a1"));
+    enqueue(B, meal("b1"));
+    let refuseB = true;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      if (refuseB && key === OUTBOX_KEY && !value.includes("b1")) throw new Error("quota exceeded");
+      return originalSetItem.call(this, key, value);
+    });
+    discardAccountDurably(A);
+    discardAccountDurably(B);
+    refuseB = false;
+    expect(retryPendingDiscard()).toBe(true);
+    expect(readQueue(A)).toEqual([]);
+    expect(readQueue(B)).toEqual([]);
+  });
+
+  it("reports unrecorded, and writes nothing, when the outbox cannot be read", () => {
+    localStorage.setItem(OUTBOX_KEY, "{not json");
+    const before = localStorage.getItem(QUARANTINE_KEY);
+    localStorage.setItem(DISCARD_KEY, JSON.stringify([A]));
+    expect(pendingDeviceCleanup()).toBe("unrecorded");
+    expect(localStorage.getItem(QUARANTINE_KEY)).toBe(before);
+    expect(localStorage.getItem(OUTBOX_KEY)).toBe("{not json");
+  });
+});

@@ -61,7 +61,9 @@ const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g:
 export function AddMeal({ owner, day, onDone, onCancel }: Props) {
   const [draft] = useState(() => readDraft(owner));
   // The id of the Save attempt in progress. See attempt.ts.
-  const attemptRef = useRef<Attempt | null>(readStoredAttempt(owner));
+  // Read once per mount. The id of the Save attempt in progress; see attempt.ts.
+  const attemptRef = useRef<Attempt | null | undefined>(undefined);
+  if (attemptRef.current === undefined) attemptRef.current = readStoredAttempt(owner);
   const [name, setName] = useState(draft?.name ?? "");
   const [start] = useState(nowRounded);
   const [mealType, setMealType] = useState<Meal["meal_type"]>(draft?.mealType ?? mealFor(start));
@@ -203,7 +205,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
     };
     // The same unchanged meal keeps its id across retries, so a save whose outcome was unclear cannot
     // be stored or sent twice.
-    const attempt = attemptFor(attemptRef.current, JSON.stringify(fields), () => crypto.randomUUID());
+    const attempt = attemptFor(attemptRef.current ?? null, JSON.stringify(fields), () => crypto.randomUUID());
     attemptRef.current = attempt;
     writeStoredAttempt(owner, attempt);
     const meal: NewMeal = { client_id: attempt.id, ...fields };
@@ -226,7 +228,6 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
         }
         attemptRef.current = null;
         writeStoredAttempt(owner, null);
-      writeStoredAttempt(owner, null);
         writeDraft(owner, null);
         onDone();
         return;

@@ -57,7 +57,7 @@ export function SignIn() {
         <p className="error" role="alert">
           {cleanup === "pending"
             ? "Meals saved on this device for an account you deleted are still stored here. Journal will try again to remove them the next time it opens."
-            : "Meals saved on this device for an account you deleted could not be removed, and this device could not record that. To remove them, clear this site's data in your browser settings."}
+            : "Meals saved on this device for an account you deleted may not have been removed, and this device cannot confirm it. To remove them, clear this site's data in your browser settings."}
         </p>
       )}
       <p className="tagline">A calmer way to see what you eat.</p>
