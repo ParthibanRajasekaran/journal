@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from factory.common import FactoryError
-from factory.protected_exceptions import approved_file_digests, diff_digest, exempted_paths
+from factory.protected_exceptions import approved_file_digests, diff_digest, exempted_paths, scope_violations
 from factory.scope import check_scope
 
 KEY = "protected_file_exceptions"
@@ -119,8 +119,6 @@ class ProtectedFileExceptions(unittest.TestCase):
         self.assertEqual(self.exempt(self.base0, candidate_with_self_approval, [OPENAPI]), set())
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class FailClosed(unittest.TestCase):
@@ -184,6 +182,13 @@ class FailClosed(unittest.TestCase):
         base = self.base_with(approvals([data]))
         self.assertEqual(approved_file_digests(self.repo, base), {})
 
+    def test_a_wrong_shaped_policy_approvals_file_stops_the_run(self) -> None:
+        from factory.policy_gate import approved_prefixes
+
+        base = self.base_with('{"exceptions": ["x"]}')
+        with self.assertRaises(FactoryError):
+            approved_prefixes(self.repo, base)
+
     def test_an_approval_for_a_policy_protected_path_is_still_refused_by_the_policy_gate(self) -> None:
         # The exemption only ever removes the project's scope message. Policy refusals are separate and remain.
         from factory.policy_gate import change_violations, PolicyLists
@@ -237,7 +242,14 @@ class ScopeWithExemption(unittest.TestCase):
         git(self.repo, "config", "diff.noprefix", "true")
         git(self.repo, "config", "diff.mnemonicPrefix", "true")
         git(self.repo, "config", "core.abbrev", "7")
+        git(self.repo, "config", "diff.algorithm", "histogram")
+        git(self.repo, "config", "diff.context", "9")
+        git(self.repo, "config", "diff.external", "/bin/false")
+        git(self.repo, "config", "diff.openapi.textconv", "/bin/false")
+        git(self.repo, "config", "diff.interHunkContext", "5")
         self.assertEqual(diff_digest(self.repo, self.base0, self.candidate, OPENAPI), self.digest)
 
 
-from factory.protected_exceptions import scope_violations  # noqa: E402
+
+if __name__ == "__main__":
+    unittest.main()

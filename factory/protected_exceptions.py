@@ -1,20 +1,23 @@
-"""Digest-bound exceptions to one protected file. Reusable for the identical diff until retired. Not single-use.
+"""Digest-bound exceptions to one protected file, per ticket. Reusable for the identical diff until retired.
 
 What an approval grants: the owner approves, at a base commit, one protected path and the SHA-256 of that path's diff
-between the base and a candidate. The factory exempts that path only while the candidate's diff for it has that digest.
+between the base and a candidate. The factory exempts that path only while the candidate's diff for it has that digest,
+and only if the ticket also allows the path.
 
-What it is bound to: the path and the digest. It is not bound to a ticket. Any ticket whose candidate produces the same
-diff for the same file, against a base where the approval is present, is exempted. The exception is retired by changing
-or removing its entry on the base. Nothing here counts uses, so it is not single-use.
+What it is bound to: the path and the digest, and optionally one ticket. An entry with a "ticket_id" applies only to that
+ticket. An entry without one applies to any ticket whose candidate produces the identical diff, until the entry is changed
+or removed on the base. Nothing counts uses, so an entry without a ticket is not single-use. Use a ticket_id to limit it.
 
 What it cannot do:
-- It never exempts a policy-level refusal. policy_gate.change_violations still refuses protected policy globs, and it
-  always refuses the approvals file. Only the project's "protected path changed" scope message can be exempted.
+- It never exempts a policy-level refusal. policy_gate.change_violations still refuses protected policy globs, and it always
+  refuses the approvals file. Only the project's "protected path changed" scope message can be exempted.
 - It never exempts the approvals file itself (APPROVALS_PATH), whatever an entry says.
-- It never exempts a path other than the one named, and never a diff whose digest differs.
+- It never exempts a path other than the one named, or a diff whose digest differs.
+- It never exempts a path the ticket does not allow.
 
-Approvals are read from the base commit, so a candidate cannot approve its own change. Malformed approval data stops the run
-with FactoryError, rather than being ignored or passed.
+Approvals are read from the base commit, so a candidate cannot approve its own change. Malformed approval data raises
+FactoryError, which stops the run. Entries that are unapproved, unnamed, for another ticket, or with a malformed digest
+are ignored.
 """
 
 from __future__ import annotations
@@ -76,15 +79,16 @@ def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -
 def diff_digest(repo: Path, base: str, head: str, path: str) -> str:
     """SHA-256 of the diff for one path between two commits.
 
-    The options are pinned, so the digest does not depend on local git configuration: literal pathspecs, full object
-    ids, fixed a/ and b/ prefixes, and no rename detection. The owner computes the digest with this same function.
+    The options are pinned, so the digest does not depend on local git configuration: literal pathspecs, no textconv,
+    a fixed diff algorithm and context, full object ids, fixed a/ and b/ prefixes, and no rename detection. The owner computes the digest with this same function.
     """
     text = gitops.git(
         repo,
         "--literal-pathspecs",
         "-c", "diff.noprefix=false",
         "-c", "diff.mnemonicPrefix=false",
-        "diff", "--no-ext-diff", "--no-color", "--full-index",
+        "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--full-index",
+        "--diff-algorithm=myers", "--unified=3", "--inter-hunk-context=0",
         "--src-prefix=a/", "--dst-prefix=b/", "--no-renames",
         base, head, "--", path,
     )

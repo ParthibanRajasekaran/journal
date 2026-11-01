@@ -74,8 +74,13 @@ def approved_prefixes(repo: Path, ref: str) -> tuple[str, ...]:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise FactoryError(f"{APPROVALS_PATH} is not valid JSON at {ref[:12]}") from exc
+    if not isinstance(data, dict):
+        raise FactoryError(f"{APPROVALS_PATH} must be a JSON object at {ref[:12]}")
+    entries = data.get("exceptions", [])
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        raise FactoryError(f"every entry in {APPROVALS_PATH} must be an object at {ref[:12]}")
     prefixes = []
-    for entry in data.get("exceptions", []):
+    for entry in entries:
         if entry.get("status") == "approved" and isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip():
             if isinstance(entry.get("prefix"), str):
                 prefixes.append(entry["prefix"])
