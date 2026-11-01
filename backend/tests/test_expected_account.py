@@ -6,8 +6,10 @@ account (another tab signed in, logout, deletion), nothing is written and the re
 client cannot make this atomic on its own, so these tests exercise the server.
 """
 
+import re
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -154,3 +156,47 @@ def test_requests_without_the_header_behave_as_before(
 ) -> None:
     _sign_in_as(client, monkeypatch, "sub-a")
     assert _create(client, _body(), None).status_code == 201
+
+
+WEB_API = Path(__file__).resolve().parents[2] / "web" / "src" / "api.ts"
+
+
+def _web_other_account_text() -> str:
+    """The refusal text the web client compares against (OTHER_ACCOUNT in web/src/api.ts)."""
+    match = re.search(
+        r'export const OTHER_ACCOUNT = "([^"]+)";', WEB_API.read_text(encoding="utf-8")
+    )
+    assert match, "OTHER_ACCOUNT is not declared in web/src/api.ts"
+    return match.group(1)
+
+
+def test_refusal_text_is_exactly_what_the_web_client_recognises(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The web client pauses, rather than blocking the meal, only on this exact text. A wording
+    # change must fail this test, so the client constant changes in the same commit.
+    owner_a = _sign_in_as(client, monkeypatch, "sub-a")
+    _sign_in_as(client, monkeypatch, "sub-b")
+
+    response = _create(client, _body(), owner_a)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == _web_other_account_text()
+
+
+def test_two_tabs_sending_the_same_meal_store_one_meal(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Two tabs of one account can both send the same queued meal. The server keeps one meal per
+    # client_id: the second request gets the meal the first one saved, so duplicate requests cannot
+    # make duplicate meals.
+    account = _sign_in_as(client, monkeypatch, "sub-a")
+    body = _body()
+
+    first = _create(client, body, account)
+    second = _create(client, body, account)
+
+    assert first.status_code == 201
+    assert second.status_code in (200, 201)
+    assert second.json()["id"] == first.json()["id"]
+    assert _saved_client_ids(client) == {body["client_id"]}

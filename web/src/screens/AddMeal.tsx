@@ -4,6 +4,8 @@ import { localDay, momentOf } from "../dates";
 import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
 import { enqueue } from "../offline";
+import { sessionOwner } from "../session";
+import { Attempt, attemptFor } from "../attempt";
 
 // The meal being typed is kept for this browser session, so a reload or a detour to add a key does
 // not lose it. It is cleared once the meal is saved or the user cancels. The draft belongs to the
@@ -58,6 +60,8 @@ const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g:
 // One path: describe, check the estimate, save. Numbers are typed only when asked for.
 export function AddMeal({ owner, day, onDone, onCancel }: Props) {
   const [draft] = useState(() => readDraft(owner));
+  // The id of the Save attempt in progress. See attempt.ts.
+  const attemptRef = useRef<Attempt | null>(null);
   const [name, setName] = useState(draft?.name ?? "");
   const [start] = useState(nowRounded);
   const [mealType, setMealType] = useState<Meal["meal_type"]>(draft?.mealType ?? mealFor(start));
@@ -186,8 +190,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
     if (failure) return setError(failure);
     setError(null);
     setSaving(true);
-    const meal: NewMeal = {
-      client_id: crypto.randomUUID(),
+    const fields = {
       meal_type: mealType,
       // Stored as an exact moment, from the time picked in the user's own time zone.
       eaten_at: momentOf(day, time),
@@ -198,8 +201,16 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
       fat_g: Number(values.fat_g),
       source: sourceFor(),
     };
+    // The same unchanged meal keeps its id across retries, so a save whose outcome was unclear cannot
+    // be stored or sent twice.
+    const attempt = attemptFor(attemptRef.current, JSON.stringify(fields), () => crypto.randomUUID());
+    attemptRef.current = attempt;
+    const meal: NewMeal = { client_id: attempt.id, ...fields };
     try {
-      await api.createMeal(meal, undefined, owner);
+      // The guard stops the save if this tab's session has moved to another account. The server check
+      // (X-Journal-Expected-Account) is what protects against another tab changing the shared cookie.
+      await api.createMeal(meal, () => sessionOwner() === owner, owner);
+      attemptRef.current = null;
       writeDraft(owner, null);
       onDone();
     } catch (err) {
@@ -211,6 +222,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
           setError(STORAGE_FAILED);
           return;
         }
+        attemptRef.current = null;
         writeDraft(owner, null);
         onDone();
         return;

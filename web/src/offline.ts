@@ -9,11 +9,24 @@ export const OUTBOX_KEY = "journal.outbox.v2";
 // and never sent. See quarantineLegacy().
 const LEGACY_KEY = "journal.pending-meals";
 export const QUARANTINE_KEY = "journal.quarantine.v1";
-// Transient failures (no connection, timeouts, server errors) are retried this many times in total
-// before the entry is shown as blocked and waits for the user.
+// Records the account whose queued meals must still be removed from this device. Written before the
+// removal starts, so a removal that storage refused is retried on the next start.
+export const DISCARD_KEY = "journal.discard-pending.v1";
+// Transient failures (no connection, timeouts, server errors, rate limits) are retried this many times
+// in total before the entry is shown as blocked and waits for the user.
 export const MAX_ATTEMPTS = 5;
 // Fired whenever the stored outbox changes, so screens can show the current count.
 export const OUTBOX_EVENT = "journal:outbox";
+
+const BACKOFF_BASE_MS = 30_000;
+const BACKOFF_MAX_MS = 10 * 60_000;
+export const GAVE_UP_REASON = "Couldn't reach Journal after several tries. Try again when you're online.";
+export const LIMITED_REASON = "Journal is limiting requests right now. It will try again, or you can try again now.";
+
+// How long a transient failure waits before the next try: 30 s, 60 s, 2 min, 4 min, then 10 min at most.
+export function backoffMs(attempts: number): number {
+  return Math.min(BACKOFF_BASE_MS * 2 ** Math.max(0, attempts - 1), BACKOFF_MAX_MS);
+}
 
 export type EntryState = "pending" | "blocked";
 
@@ -22,6 +35,8 @@ export interface OutboxEntry {
   meal: NewMeal;
   state: EntryState;
   attempts: number;
+  // Earliest time (ms since epoch) the next try may happen after a transient failure.
+  retryAt?: number;
   reason?: string;
 }
 
@@ -55,8 +70,10 @@ function storage(): Storage | null {
   }
 }
 
-// Writes the quarantine and reads it back. Returns true only when the text is durably there. A
+// Writes the quarantine and reads it back. Returns true only when every item is durably there. A
 // damaged quarantine is never overwritten, because that would destroy the only copy of its contents.
+// Items already in quarantine are not added again, so reading the same damaged data repeatedly does
+// not grow the quarantine.
 function quarantine(items: string[]): boolean {
   const store = storage();
   if (!store) return false;
@@ -70,7 +87,10 @@ function quarantine(items: string[]): boolean {
   } catch {
     return false;
   }
-  const text = JSON.stringify([...existing, ...items]);
+  const seen = new Set(existing.map((item) => (typeof item === "string" ? item : JSON.stringify(item))));
+  const fresh = items.filter((item) => !seen.has(item));
+  if (fresh.length === 0) return true;
+  const text = JSON.stringify([...existing, ...fresh]);
   try {
     store.setItem(QUARANTINE_KEY, text);
     return store.getItem(QUARANTINE_KEY) === text;
@@ -86,9 +106,15 @@ interface OutboxRead {
   safe: boolean;
 }
 
-// Reads every entry. Anything that is not a valid entry is copied to quarantine first. The stored text
-// is replaced only after that copy reads back. If the copy cannot be verified, the stored text is left
-// exactly as it was and the read is marked unsafe.
+// The stored text is replaced only after the damaged part has been copied to quarantine and read back.
+// If the copy cannot be verified, the stored text is left exactly as it was and the read is marked unsafe.
+function quarantineThenClear(raw: string): OutboxRead {
+  if (!quarantine([raw])) return { entries: [], safe: false };
+  const cleared = commit([]);
+  return { entries: [], safe: cleared.ok };
+}
+
+// Reads every entry. Anything that is not a valid entry is copied to quarantine first.
 function readOutbox(): OutboxRead {
   const store = storage();
   if (!store) return { entries: [], safe: false };
@@ -103,9 +129,9 @@ function readOutbox(): OutboxRead {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { entries: [], safe: quarantine([raw]) };
+    return quarantineThenClear(raw);
   }
-  if (!Array.isArray(parsed)) return { entries: [], safe: quarantine([raw]) };
+  if (!Array.isArray(parsed)) return quarantineThenClear(raw);
   const valid = parsed.filter(isEntry);
   const malformed = parsed.filter((item) => !isEntry(item));
   if (malformed.length === 0) return { entries: valid, safe: true };
@@ -182,32 +208,115 @@ export function enqueue(owner: string, meal: NewMeal): CommitResult {
   ]);
 }
 
+// Removes one meal the user has chosen to discard.
+export function discardEntry(owner: string, clientId: string): CommitResult {
+  return mutate((entries) => entries.filter((e) => !(e.owner === owner && e.meal.client_id === clientId)));
+}
+
 // Removes one account's entries. Used when the account is deleted, so queued meals cannot come back.
 export function discardOwner(owner: string): CommitResult {
   return mutate((entries) => entries.filter((e) => e.owner !== owner));
 }
 
+// Set when the account's removal was refused and the refusal could not be recorded either.
+let unrecordedCleanup: string | null = null;
+
+function readDiscardRecord(): string | null {
+  const store = storage();
+  if (!store) return null;
+  try {
+    const raw = store.getItem(DISCARD_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as { owner?: unknown };
+    return typeof parsed.owner === "string" ? parsed.owner : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordDiscard(owner: string): boolean {
+  const store = storage();
+  if (!store) return false;
+  const text = JSON.stringify({ owner });
+  try {
+    store.setItem(DISCARD_KEY, text);
+    return store.getItem(DISCARD_KEY) === text;
+  } catch {
+    return false;
+  }
+}
+
+function clearDiscardRecord(owner: string): void {
+  if (readDiscardRecord() !== owner) return;
+  try {
+    storage()?.removeItem(DISCARD_KEY);
+  } catch {
+    // A leftover record only means one more harmless retry, which finds nothing to remove.
+  }
+}
+
+export type DiscardResult = { ok: true } | { ok: false; recorded: boolean };
+
+// Removes a deleted account's queued meals from this device. Success is reported only when the
+// removal has been read back. On failure the obligation is recorded, so retryPendingDiscard() can
+// finish it after a restart; if even the record cannot be written, pendingDeviceCleanup() says so.
+export function discardAccountDurably(owner: string): DiscardResult {
+  const recorded = recordDiscard(owner);
+  const result = discardOwner(owner);
+  if (result.ok) {
+    clearDiscardRecord(owner);
+    if (unrecordedCleanup === owner) unrecordedCleanup = null;
+    return { ok: true };
+  }
+  unrecordedCleanup = recorded ? null : owner;
+  return { ok: false, recorded };
+}
+
+// Runs at start-up. Finishes a removal that an earlier run could not complete. Returns true when
+// nothing is left to remove.
+export function retryPendingDiscard(): boolean {
+  const owner = readDiscardRecord();
+  if (owner === null) return true;
+  const result = discardOwner(owner);
+  if (!result.ok) return false;
+  clearDiscardRecord(owner);
+  if (unrecordedCleanup === owner) unrecordedCleanup = null;
+  return true;
+}
+
+// What the sign-in screen must say about this device's data for a deleted account.
+export type DeviceCleanup = "none" | "pending" | "unrecorded";
+export function pendingDeviceCleanup(): DeviceCleanup {
+  if (readDiscardRecord() !== null) return "pending";
+  if (unrecordedCleanup !== null) return "unrecorded";
+  return "none";
+}
+
 // Puts blocked entries back in line, for example after the user has fixed the problem.
 export function retryBlocked(owner: string): CommitResult {
   return mutate((entries) =>
-    entries.map((e) => (e.owner === owner && e.state === "blocked" ? { ...e, state: "pending", attempts: 0, reason: undefined } : e)),
+    entries.map((e) =>
+      e.owner === owner && e.state === "blocked" ? { ...e, state: "pending", attempts: 0, retryAt: undefined, reason: undefined } : e,
+    ),
   );
 }
 
 // Decides what a failed send means for the entry.
 //   "pause": the account needs to sign in again, or the session changed. Stop sending for everyone.
-//   "retry": a transient problem; try again later, up to MAX_ATTEMPTS.
+//   "retry": a transient problem; try again after a delay, up to MAX_ATTEMPTS. `limited` marks a rate limit.
 //   "block": the server refused this meal; the user must act.
-function classify(err: unknown): { kind: "pause" } | { kind: "retry" } | { kind: "block"; reason: string } {
+type Verdict = { kind: "pause" } | { kind: "retry"; limited: boolean } | { kind: "block"; reason: string };
+function classify(err: unknown): Verdict {
   if (err instanceof ApiError) {
     if (err.status === 401 || err.status === 403) return { kind: "pause" };
     // Another account owns the session. The meal stays queued for its own account; it is not invalid.
     if (err.status === 409 && err.message === OTHER_ACCOUNT) return { kind: "pause" };
-    if (err.status === 0 || err.status === 408 || err.status >= 500) return { kind: "retry" };
-    if (err.status === 409 && err.message === "Retry the request.") return { kind: "retry" };
+    if (err.status === 429) return { kind: "retry", limited: true };
+    if (err.status === 0 || err.status === 408 || err.status >= 500) return { kind: "retry", limited: false };
+    if (err.status === 409 && err.message === "Retry the request.") return { kind: "retry", limited: false };
     return { kind: "block", reason: err.message };
   }
-  return { kind: "retry" };
+  return { kind: "retry", limited: false };
 }
 
 function update(owner: string, clientId: string, change: (e: OutboxEntry) => OutboxEntry | null): void {
@@ -225,6 +334,21 @@ function update(owner: string, clientId: string, change: (e: OutboxEntry) => Out
   });
 }
 
+// Schedules the next pass for an account after a transient failure. One timer per account.
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+// The retry uses the same sender as the failed attempt, so a retry never goes somewhere else.
+function scheduleRetry(owner: string, delay: number, send: SendMeal): void {
+  if (typeof window === "undefined") return;
+  clearTimeout(timers.get(owner));
+  timers.set(
+    owner,
+    setTimeout(() => {
+      timers.delete(owner);
+      void flushQueue(owner, send);
+    }, delay),
+  );
+}
+
 async function sendPending(owner: string, send: SendMeal): Promise<number> {
   const stillOwner = () => sessionOwner() === owner;
   // Sending removes entries afterwards. If the outbox is unsafe, that removal could drop a record, so nothing is sent.
@@ -232,6 +356,8 @@ async function sendPending(owner: string, send: SendMeal): Promise<number> {
   let sent = 0;
   for (const entry of readQueue(owner)) {
     if (entry.state !== "pending") continue;
+    // A transient failure set this entry aside until its delay has passed.
+    if (entry.retryAt !== undefined && entry.retryAt > Date.now()) continue;
     // Check before every send: the session may have changed while an earlier request was in flight.
     if (!stillOwner()) break;
     try {
@@ -240,12 +366,17 @@ async function sendPending(owner: string, send: SendMeal): Promise<number> {
       const verdict = classify(err);
       if (verdict.kind === "pause") break;
       if (verdict.kind === "retry") {
+        const { limited } = verdict;
+        let delay = 0;
         update(owner, entry.meal.client_id, (e) => {
           const attempts = e.attempts + 1;
-          return attempts >= MAX_ATTEMPTS
-            ? { ...e, attempts, state: "blocked", reason: "Couldn't reach Journal after several tries. Retry when you're online." }
-            : { ...e, attempts };
+          if (attempts >= MAX_ATTEMPTS) {
+            return { ...e, attempts, state: "blocked", retryAt: undefined, reason: limited ? LIMITED_REASON : GAVE_UP_REASON };
+          }
+          delay = backoffMs(attempts);
+          return { ...e, attempts, retryAt: Date.now() + delay };
         });
+        if (delay > 0) scheduleRetry(owner, delay, send);
         break;
       }
       update(owner, entry.meal.client_id, (e) => ({ ...e, state: "blocked", reason: verdict.reason }));

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, NewMeal, OTHER_ACCOUNT } from "./api";
 import {
   MAX_ATTEMPTS,
+  backoffMs,
   OUTBOX_KEY,
   QUARANTINE_KEY,
   discardOwner,
@@ -53,6 +54,7 @@ beforeEach(() => {
   setSessionOwner(null);
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   localStorage.clear();
   setSessionOwner(null);
@@ -187,6 +189,7 @@ describe("saving on this device", () => {
 
 describe("lost responses and concurrency", () => {
   it("creates one server meal when the response is lost after the server saved it", async () => {
+    vi.useFakeTimers();
     enqueue(A, meal("a1"));
     const server = fakeServer();
     server.send.mockImplementationOnce(async (m: NewMeal) => {
@@ -197,7 +200,9 @@ describe("lost responses and concurrency", () => {
     expect(await flushAs(A, server.send)).toBe(0);
     expect(readQueue(A)).toHaveLength(1);
 
-    expect(await flushAs(A, server.send)).toBe(1);
+    // The retry runs after its backoff, with the same sender, and sends the same client_id.
+    await vi.advanceTimersByTimeAsync(backoffMs(1));
+    expect(server.send).toHaveBeenCalledTimes(2);
     expect(server.stored.size).toBe(1);
     expect(readQueue(A)).toEqual([]);
   });
@@ -263,14 +268,17 @@ describe("pausing and blocking", () => {
   });
 
   it("blocks a meal after the bounded number of transient failures", async () => {
+    vi.useFakeTimers();
     enqueue(A, meal("a1"));
     const send = vi.fn().mockRejectedValue(new ApiError(503, "Unavailable"));
 
-    for (let i = 0; i < MAX_ATTEMPTS; i += 1) await flushAs(A, send);
+    await flushAs(A, send);
+    // Each retry waits its backoff, and the longest single wait is 10 minutes.
+    await vi.advanceTimersByTimeAsync(10 * 60_000 * MAX_ATTEMPTS);
 
     expect(send).toHaveBeenCalledTimes(MAX_ATTEMPTS);
     expect(readQueue(A)[0].state).toBe("blocked");
-    await flushAs(A, send);
+    await vi.advanceTimersByTimeAsync(10 * 60_000 * 3);
     expect(send).toHaveBeenCalledTimes(MAX_ATTEMPTS);
   });
 

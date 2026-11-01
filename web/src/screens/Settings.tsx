@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useId, useState } from "react";
 import { api, AiKeyStatus, Profile, Provider } from "../api";
 import { PROVIDERS as KEY_PAGES } from "./KeyHelp";
-import { discardOwner } from "../offline";
+import { discardAccountDurably } from "../offline";
 
 interface Props {
   profile: Profile;
@@ -274,9 +274,10 @@ function DeleteAccount({ owner, onDeleted }: { owner: string; onDeleted: () => v
     setError(null);
     try {
       await api.deleteAccount();
-      // Meals still waiting on this device belong to the deleted account. Drop them now, so they
-      // cannot be sent after the account no longer exists.
-      discardOwner(owner);
+      // Meals still waiting on this device belong to the deleted account. They are removed now, and the
+      // result is recorded: if storage refuses the removal, the sign-in screen says so and it is retried
+      // on the next start. Nothing here claims the removal succeeded unless it was read back.
+      discardAccountDurably(owner);
       onDeleted();
     } catch (err) {
       setError((err as Error).message);

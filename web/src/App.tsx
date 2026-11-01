@@ -6,7 +6,7 @@ import { AddMeal } from "./screens/AddMeal";
 import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
 import { localDay } from "./dates";
-import { flushQueue, quarantineLegacy } from "./offline";
+import { flushQueue, quarantineLegacy, retryPendingDiscard } from "./offline";
 import { setSessionOwner } from "./session";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
@@ -36,6 +36,8 @@ export function App() {
   const ownerId = profile !== null && typeof profile === "object" ? profile.id : null;
   useEffect(() => {
     quarantineLegacy();
+    // Finishes removing a deleted account's meals if an earlier attempt was refused. See offline.ts.
+    retryPendingDiscard();
   }, []);
   // Recorded before the flush below runs, so a flush always sees the account the session belongs to.
   useEffect(() => {

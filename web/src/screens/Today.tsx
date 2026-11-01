@@ -4,7 +4,7 @@ import { EditMeal } from "./EditMeal";
 import { MacroSplit } from "./MacroSplit";
 import { addDays, formatDay, localDay, timeOf, userTz } from "../dates";
 import { savedLine } from "../encouragement";
-import { OUTBOX_EVENT, flushQueue, readQueue, retryBlocked } from "../offline";
+import { OUTBOX_EVENT, discardEntry, flushQueue, readQueue, retryBlocked } from "../offline";
 import { Hand, Heart, ThumbsUp, type LucideIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -32,7 +32,9 @@ export function Today({ owner, day, onDayChange, onAdd, savedNote }: Props) {
   // Meals this account saved on this device that have not reached the server yet.
   const [waiting, setWaiting] = useState(() => readQueue(owner));
   const pending = waiting.filter((e) => e.state === "pending").length;
-  const blocked = waiting.filter((e) => e.state === "blocked").length;
+  const blockedEntries = waiting.filter((e) => e.state === "blocked");
+  const blocked = blockedEntries.length;
+  const [discardError, setDiscardError] = useState<string | null>(null);
   useEffect(() => {
     const refresh = () => setWaiting(readQueue(owner));
     window.addEventListener("online", refresh);
@@ -92,18 +94,39 @@ export function Today({ owner, day, onDayChange, onAdd, savedNote }: Props) {
         </p>
       )}
       {blocked > 0 && (
-        <p className="error" role="alert">
-          {blocked === 1 ? "1 saved meal" : `${blocked} saved meals`} couldn't be sent.{" "}
-          <button
-            className="ghost"
-            onClick={() => {
-              retryBlocked(owner);
-              void flushQueue(owner);
-            }}
-          >
-            Try again
-          </button>
-        </p>
+        <section className="blocked-meals" aria-label="Saved meals that couldn't be sent">
+          <p className="error" role="alert">
+            {blocked === 1 ? "1 saved meal" : `${blocked} saved meals`} couldn't be sent.{" "}
+            <button
+              className="ghost"
+              onClick={() => {
+                retryBlocked(owner);
+                void flushQueue(owner);
+              }}
+            >
+              Try again
+            </button>
+          </p>
+          <ul>
+            {blockedEntries.map((e) => (
+              <li key={e.meal.client_id}>
+                <strong>{e.meal.name}</strong>: {e.reason ?? "Journal couldn't accept this meal."}{" "}
+                <button
+                  className="ghost"
+                  onClick={() => {
+                    const result = discardEntry(owner, e.meal.client_id);
+                    setDiscardError(
+                      result.ok ? null : "This meal couldn't be discarded, because this device couldn't save the change. Try again.",
+                    );
+                  }}
+                >
+                  Discard {e.meal.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {discardError && <p className="error" role="alert">{discardError}</p>}
+        </section>
       )}
 
       {showSaved && summary && (

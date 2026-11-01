@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { pendingDeviceCleanup } from "../offline";
 
 // The server keeps the real record: the first sign-in of each account must confirm 18+, and the
 // confirmation is then kept for that account. This device flag only stops the question being asked
@@ -25,6 +26,8 @@ function writeDeviceFlag(on: boolean): void {
 
 // Shown when sign-in cannot start, or when Google or the server sends the user back with a failure.
 export function SignIn() {
+  // What is still on this device for a deleted account. Read on each render, so it stays current.
+  const cleanup = pendingDeviceCleanup();
   const [failed, setFailed] = useState(false);
   const [needsAdult, setNeedsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,6 +53,13 @@ export function SignIn() {
   return (
     <main className="shell signin">
       <h1 className="signin-title">Journal</h1>
+      {cleanup !== "none" && (
+        <p className="error" role="alert">
+          {cleanup === "pending"
+            ? "Meals saved on this device for an account you deleted are still stored here. Journal will try again to remove them the next time it opens."
+            : "Meals saved on this device for an account you deleted could not be removed, and this device could not record that. To remove them, clear this site's data in your browser settings."}
+        </p>
+      )}
       <p className="tagline">A calmer way to see what you eat.</p>
 
       <section className="card signin-card">
