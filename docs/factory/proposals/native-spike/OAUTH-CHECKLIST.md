@@ -1,45 +1,87 @@
-# Google OAuth setup for the native spike (owner steps)
+# Google OAuth checklist for native sign-in (owner steps)
 
-Identifiers below are derived from this repository, not invented. Nothing secret is listed. You create the clients,
-and you handle consent and any credential. The agent has not created, changed or read any Google setting.
+Status: prepared, not performed. The agent has not created, changed or read any Google Cloud setting, and has not
+signed in with any Google account. Identifiers below are either derived from this repository or are public
+client identifiers. No secret, token or account email appears in this document.
 
-## Values derived from the project
+Scope: Google sign-in only, through the in-repo plugin `@journal/google-auth` (GoogleSignIn-iOS 9.2.0 and Android
+Credential Manager). Facebook is absent from the build, so no Facebook decision is needed.
 
-| Item | Value | Where it comes from |
+## 1. Values that come from the repository
+
+| Item | Value | Source |
 |---|---|---|
 | Android application ID | `com.journal.nutrition` | `web/android/app/build.gradle`, `applicationId` |
-| iOS bundle identifier | `com.journal.nutrition` | `web/ios/App/App.xcodeproj`, `PRODUCT_BUNDLE_IDENTIFIER` |
-| Android debug signing SHA-1 | `9B:63:12:33:3A:6D:BC:09:83:F9:2E:B8:DB:39:F4:6E:0A:A0:F3:46` | `keytool -list -v` on `~/.android/debug.keystore`, alias `androiddebugkey`. A public certificate fingerprint. |
-| Android release signing SHA-1 | not yet available | Needed only for a release build. Obtain it from the release keystore when one exists. |
-| Web application client | the existing production web client already used by the backend as `JOURNAL_GOOGLE_CLIENT_ID` | Copy its ID from your own secret store. It is not printed here, and it is not a secret. |
+| iOS bundle identifier | `com.journal.nutrition` | `web/ios/App/App.xcodeproj/project.pbxproj`, `PRODUCT_BUNDLE_IDENTIFIER` |
+| Android debug signing SHA-1 | `9B:63:12:33:3A:6D:BC:09:83:F9:2E:B8:DB:39:F4:6E:0A:A0:F3:46` | `keytool -list -v` on `~/.android/debug.keystore`, alias `androiddebugkey`. A public certificate fingerprint, used for debug builds only. |
+| Android release SHA-1 | not available | Needed only for a release build. Take it from the release keystore when one exists. Register it as a second Android client. |
 
-## Steps
+## 2. Google Cloud steps (owner)
 
-1. **Web application client (existing).** Do not create a new one. Use the existing client. Confirm in Google Cloud
-   that it is of type "Web application". It is the audience of every ID token this app accepts.
-2. **Android client (new).** Create an OAuth client of type **Android**. Package name `com.journal.nutrition`. SHA-1
-   `9B:63:12:33:3A:6D:BC:09:83:F9:2E:B8:DB:39:F4:6E:0A:A0:F3:46` (debug). Do not pass this client's ID to the app.
-   Create a second Android client later for the release SHA-1.
-3. **iOS client (new).** Create an OAuth client of type **iOS**. Bundle ID `com.journal.nutrition`. Note two values
-   it shows: the client ID, and the **reversed client ID** (the same ID with its dot-separated parts reversed).
-4. **Consent screen.** Set it to Testing. Add each Google account that will sign in as a test user.
-5. **Give the agent these two values only, for the build:**
-   - `VITE_GOOGLE_WEB_CLIENT_ID`: the web client ID.
-   - `VITE_GOOGLE_IOS_CLIENT_ID`: the iOS client ID.
-   Set them in your shell or CI environment for the build. Do not commit them to a file. Public client IDs are not
-   secrets, but keeping them out of the repository keeps builds reproducible without hardcoding a developer setting.
-6. **iOS URL scheme (owner-supplied).** Add the reversed client ID as a URL scheme in
-   `web/ios/App/App/Info.plist`, under `CFBundleURLTypes` / `CFBundleURLSchemes`. This is a value only you have, and
-   the agent will add it when you supply it.
+1. **Web application client (existing, do not create a new one).** Confirm in Google Cloud that the existing
+   production client is of type "Web application". Its ID is the audience of every ID token the backend accepts.
+2. **Android client (new).** Type **Android**. Package name `com.journal.nutrition`. SHA-1: the debug value above.
+   Do not give this client's ID to the app. Its ID is never used in the code.
+3. **iOS client (new).** Type **iOS**. Bundle ID `com.journal.nutrition`. Note two values Google shows:
+   the **client ID** and the **reversed client ID** (the same ID with its dot-separated parts in reverse order).
+4. **Consent screen.** Set the publishing status to **Testing**. Add each Google account that will sign in under
+   "Test users". Record the accounts in your own notes, not in this repository.
 
-## Never put in evidence, logs or the repository
+## 3. Values the owner supplies to the build (never committed)
 
-- Any client secret, refresh token, ID token, access token or account email.
-- Screenshots or logs that show an account email. Redact before sharing.
+| Name | Holds | Read by | How to supply |
+|---|---|---|---|
+| `VITE_GOOGLE_WEB_CLIENT_ID` | the web client ID | `web/src/native/platform.ts` (sent as the server client ID) | Shell or CI environment variable at build time |
+| `VITE_GOOGLE_IOS_CLIENT_ID` | the iOS client ID | `web/src/native/platform.ts` (iOS only) | Shell or CI environment variable at build time |
+| `JOURNAL_GOOGLE_CLIENT_ID` | the web client ID (same value) | `backend/app/config.py`, which reads the `JOURNAL_` prefix from the environment or `backend/.env` | Backend environment only |
 
-## What the spike needs from you, in order
+Rules:
 
-1. Steps 1 to 4 above.
-2. Step 5 values, for a debug build on the emulator or a phone.
-3. Step 6 value, before the iOS build is attempted.
-4. Confirm you accept the Facebook SDK question in `LICENSES.md` before any iOS build leaves this machine.
+- The backend needs the **client ID only** for native sign-in. Do not add `JOURNAL_GOOGLE_CLIENT_SECRET` for this
+  work, and never pass a client secret to the app or the build. The native path does not use it.
+- Do not write any of these values to a tracked file. Keep them in your shell, CI secrets or an untracked env file.
+- If a value is missing, the app does not start a sign-in. It shows "VITE_GOOGLE_WEB_CLIENT_ID is not set for this
+  build", or the iPhone equivalent, which names the variable and never its value (`web/src/native/google.ts`).
+
+## 4. iOS URL scheme (owner-supplied value)
+
+`web/ios/App/App/Info.plist` currently has **no** `CFBundleURLTypes` entry. Add the reversed iOS client ID as one
+URL scheme so GoogleSignIn can return to the app:
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string><reversed iOS client ID></string>
+    </array>
+  </dict>
+</array>
+```
+
+The agent will add this entry only when you supply the reversed client ID. Until then the iOS sign-in cannot return
+to the app. `SceneDelegate.swift` already passes incoming URLs to `GIDSignIn`.
+
+## 5. Checks before the first sign-in attempt
+
+- [ ] Web client is type "Web application" and is the same ID as `JOURNAL_GOOGLE_CLIENT_ID` on the backend.
+- [ ] Android client exists with package `com.journal.nutrition` and the debug SHA-1 above.
+- [ ] iOS client exists with bundle `com.journal.nutrition`, and the reversed client ID is in `Info.plist`.
+- [ ] Consent screen is in Testing and each test account is listed.
+- [ ] `VITE_GOOGLE_WEB_CLIENT_ID` is set for the build. `VITE_GOOGLE_IOS_CLIENT_ID` is set for any iPhone build.
+- [ ] No client secret is in the app, the build environment for the app, or any tracked file.
+
+## 6. Never put in evidence, logs, screenshots or the repository
+
+- Any client secret, ID token, access token, refresh token, or the `attempt_secret`.
+- Any Google account email. Redact it from screenshots and logs before sharing. Use a role, such as "test account A".
+- Full values of the build variables, when you paste a command. Replace them with `<set>`.
+
+## 7. What is still needed from you, in order
+
+1. Steps 2 to 4 in Google Cloud.
+2. Section 3 values for an Android debug build, then run the guided sign-in test in
+   `GUIDED-SIGN-IN-TEST.md`.
+3. Section 4 value (the reversed iOS client ID) before an iPhone build can complete a sign-in.
+4. The release SHA-1, only when a release build is planned.

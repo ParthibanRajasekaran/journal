@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.3"),
         .package(name: "AparajitaCapacitorSecureStorage", path: "../../../node_modules/@aparajita/capacitor-secure-storage"),
-        .package(name: "CapgoCapacitorSocialLogin", path: "../../../node_modules/@capgo/capacitor-social-login")
+        .package(name: "JournalGoogleAuth", path: "../../../plugins/journal-google-auth")
     ],
     targets: [
         .target(
@@ -22,7 +22,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "AparajitaCapacitorSecureStorage", package: "AparajitaCapacitorSecureStorage"),
-                .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin")
+                .product(name: "JournalGoogleAuth", package: "JournalGoogleAuth")
             ]
         )
     ]

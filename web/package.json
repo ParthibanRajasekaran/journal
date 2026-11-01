@@ -15,7 +15,7 @@
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@capacitor/ios": "8.5.3",
-    "@capgo/capacitor-social-login": "8.7.5",
+    "@journal/google-auth": "file:plugins/journal-google-auth",
     "canvas-confetti": "1.9.4",
     "lucide-react": "1.57.0",
     "motion": "14.2.0",
