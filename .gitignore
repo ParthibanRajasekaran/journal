@@ -42,3 +42,9 @@ web/dist/
 # Playwright output
 web/test-results/
 web/playwright-report/
+
+# Factory run state, worktrees and reports (local only)
+.factory-local/
+
+# Python bytecode
+__pycache__/

@@ -49,3 +49,18 @@ hooks:
 # Web screens: type-check, unit tests, and a production build.
 web:
 	cd web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
+
+# Factory controller tests. Stdlib only; no model calls, no network writes.
+.PHONY: factory
+factory:
+	python3 -m unittest discover -s factory/tests -t . -p "test_*.py"
+
+# Native sign-in attempt model (proposal). SQLite-backed; see docs/factory/proposals/native-auth/DESIGN.md.
+.PHONY: native-proposal
+native-proposal:
+	python3 -m unittest discover -s docs/factory/proposals/native-auth -p "test_*.py"
+
+# One reproducible command for every required check (see scripts/verify.sh). Refuses a dirty tree.
+.PHONY: verify
+verify:
+	./scripts/verify.sh

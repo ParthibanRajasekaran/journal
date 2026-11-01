@@ -1,3 +1,5 @@
+import { nativeBridge } from "./native/bridge";
+
 // Typed client for the Journal API. The browser holds only HttpOnly cookies, so every
 // request sends credentials, and every change carries the CSRF header the API requires.
 
@@ -102,8 +104,22 @@ export type EstimateReply =
       };
     };
 
+export interface NativeAttempt {
+  attempt_secret: string;
+  nonce: string;
+  expires_in: number;
+}
+
+export interface NativeTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
 export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
-const BASE = "/api/v1";
+// Empty for the web build, which is served by the API. Native builds set VITE_API_BASE to the
+// HTTPS origin of the backend, for example https://journal.example.
+const BASE = `${import.meta.env.VITE_API_BASE ?? ""}/api/v1`;
 
 // Shown when the connection drops, so no raw browser message reaches the user.
 export const OFFLINE_MESSAGE = "Can't reach Journal right now. Check your connection, then try again.";
@@ -112,6 +128,8 @@ export const SIGNED_OUT_EVENT = "journal:signed-out";
 
 async function send(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<Response> {
   const headers: Record<string, string> = { ...extra };
+  // Read at send time, so a request retried after a native refresh uses the new token.
+  if (nativeBridge.accessToken) headers.Authorization = `Bearer ${nativeBridge.accessToken}`;
   if (method !== "GET") Object.assign(headers, CSRF_HEADER);
   if (body !== undefined) headers["Content-Type"] = "application/json";
   try {
@@ -139,10 +157,20 @@ function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>): Promise<T> {
+// Raised instead of sending when the session now belongs to another account. Nothing is sent.
+export const STALE_SESSION = "The signed-in account changed. This request was not sent.";
+// The server's answer when a write names an account that the session no longer belongs to.
+export const OTHER_ACCOUNT = "This request was made for another account. Nothing was saved.";
+
+// `guard` is checked before the first send and again before any resend after a refresh. A request
+// made for one account is never replayed on another account's session.
+async function request<T>(method: string, path: string, body?: unknown, extra?: Record<string, string>, guard?: () => boolean): Promise<T> {
+  if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
   let response = await send(method, path, body, extra);
   if (response.status === 401 && !path.startsWith("/auth/")) {
-    if (await refreshSession()) {
+    const renewed = nativeBridge.refresh ? await nativeBridge.refresh() : await refreshSession();
+    if (renewed) {
+      if (guard && !guard()) throw new ApiError(401, STALE_SESSION);
       response = await send(method, path, body, extra);
     } else if (typeof window !== "undefined") {
       window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
@@ -164,6 +192,8 @@ async function request<T>(method: string, path: string, body?: unknown, extra?: 
 
 export const api = {
   signInUrl: `${BASE}/auth/google/start`,
+  // Read-only reachability check. It sends no credentials and changes nothing on the server.
+  health: () => request<{ status: string }>("GET", "/health"),
   me: () => request<Profile>("GET", "/me"),
   // A target set to null is cleared.
   updateMe: (patch: {
@@ -173,13 +203,30 @@ export const api = {
   }) =>
     request<Profile>("PATCH", "/me", patch),
   deleteAccount: () => request<void>("DELETE", "/me"),
-  logout: () => request<void>("POST", "/auth/logout"),
+  // A native session is ended by the native module, which also clears the device's stored token.
+  logout: () => (nativeBridge.signOut ? nativeBridge.signOut() : request<void>("POST", "/auth/logout")),
+  createNativeAttempt: () => request<NativeAttempt>("POST", "/auth/native/attempts"),
+  cancelNativeAttempt: (attemptSecret: string) =>
+    request<void>("POST", "/auth/native/attempts/cancel", { attempt_secret: attemptSecret }),
+  completeNativeSignIn: (attemptSecret: string, idToken: string, adult: boolean) =>
+    request<NativeTokens>("POST", "/auth/native/complete", { attempt_secret: attemptSecret, id_token: idToken, adult }),
+  refreshNativeSession: (refreshToken: string) =>
+    request<NativeTokens>("POST", "/auth/native/refresh", { refresh_token: refreshToken }),
+  logoutNative: (refreshToken: string) => request<void>("POST", "/auth/native/logout", { refresh_token: refreshToken }),
 
   day: (date: string, tz: string) => request<DaySummary>("GET", `/days/${date}?tz=${encodeURIComponent(tz)}`),
   week: (start: string, tz: string) => request<Totals[]>("GET", `/week?start=${start}&tz=${encodeURIComponent(tz)}`),
 
-  createMeal: (meal: NewMeal) =>
-    request<Meal>("POST", "/meals", meal, { "Idempotency-Key": meal.client_id }),
+  // `expectedAccount` names the account the write was made for. The server refuses the write, and saves
+  // nothing, when the session belongs to a different account. A client check alone cannot prevent this.
+  createMeal: (meal: NewMeal, guard?: () => boolean, expectedAccount?: string) =>
+    request<Meal>(
+      "POST",
+      "/meals",
+      meal,
+      { "Idempotency-Key": meal.client_id, ...(expectedAccount ? { "X-Journal-Expected-Account": expectedAccount } : {}) },
+      guard,
+    ),
   updateMeal: (meal: Pick<Meal, "id" | "version">, patch: Partial<Omit<NewMeal, "client_id" | "source">>) =>
     request<Meal>("PATCH", `/meals/${meal.id}`, patch, { "If-Match": String(meal.version) }),
   deleteMeal: (id: string) => request<void>("DELETE", `/meals/${id}`),

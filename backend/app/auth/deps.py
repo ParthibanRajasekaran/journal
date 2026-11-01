@@ -43,8 +43,16 @@ def require_write(request: Request, user_id: str) -> None:
         raise HTTPException(status_code=429, detail="Too many changes. Try again in a minute.")
 
 
+def _bearer_token(request: Request) -> str | None:
+    """Native clients send the access token as a bearer token. Web keeps the HttpOnly cookie."""
+    scheme, _, value = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    return value.strip()
+
+
 def current_user_id(request: Request) -> str:
-    token = request.cookies.get(ACCESS_COOKIE)
+    token = request.cookies.get(ACCESS_COOKIE) or _bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required.")
     try:

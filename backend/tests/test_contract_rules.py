@@ -21,6 +21,11 @@ PUBLIC_OPERATIONS = {
     ("/auth/google/start", "get"),
     ("/auth/google/callback", "get"),
     ("/auth/refresh", "post"),
+    ("/auth/native/attempts", "post"),
+    ("/auth/native/attempts/cancel", "post"),
+    ("/auth/native/complete", "post"),
+    ("/auth/native/refresh", "post"),
+    ("/auth/native/logout", "post"),
     ("/health", "get"),
     ("/health/ready", "get"),
 }
