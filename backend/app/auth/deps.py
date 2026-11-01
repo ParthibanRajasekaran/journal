@@ -4,9 +4,11 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.tokens import AuthError, signing_key, user_id_from_access_token
+from app.db.models import User
 
 
 def auth_key(settings: object) -> str:
@@ -43,14 +45,22 @@ def require_write(request: Request, user_id: str) -> None:
         raise HTTPException(status_code=429, detail="Too many changes. Try again in a minute.")
 
 
-def current_user_id(request: Request) -> str:
+async def current_user_id(
+    request: Request, session: Annotated[AsyncSession, Depends(get_session)]
+) -> str:
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required.")
     try:
-        return user_id_from_access_token(token, auth_key(request.app.state.settings))
+        user_id = user_id_from_access_token(token, auth_key(request.app.state.settings))
     except AuthError as exc:
         raise HTTPException(status_code=401, detail="Sign in required.") from exc
+    # A valid token is not enough: its account must still exist. A deleted account's copied
+    # token is refused here, before any read or write, so it never reaches a foreign-key failure.
+    exists = (await session.execute(select(User.id).where(User.id == user_id))).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    return user_id
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]

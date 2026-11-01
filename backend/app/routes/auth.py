@@ -213,7 +213,7 @@ async def logout(
     session: SessionDep,
 ) -> None:
     require_csrf(request)
-    current_user_id(request)
+    await current_user_id(request, session)
     raw = request.cookies.get(REFRESH_COOKIE)
     if raw is not None:
         await service.revoke(session, raw)
