@@ -19,3 +19,7 @@ fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-k
 
 # Historical only: a plainly fake attempt value in the native sign-in test fixture (commit 00a00a1, web/src/native/auth.test.ts line 10). The value was renamed in 95f1006; history is not rewritten.
 00a00a1e377144f1b0c7619f4a56058ea9d3dced:web/src/native/auth.test.ts:generic-api-key:10
+
+# Same reviewed false positive as above, in the combined outbox candidate commit 4fefa3c (line 11). It is the
+# quarantine storage key name, not a credential. Added with the candidate, per docs/factory/proposals/outbox-plan.md step 3.
+4fefa3c4998a7cb54f81dcc29018a44b866a0939:web/src/offline.ts:generic-api-key:11
