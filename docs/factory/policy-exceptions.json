@@ -2,9 +2,9 @@
   "exceptions": [
     {
       "prefix": "web/src/",
-      "status": "pending-owner-approval",
-      "approved_by": "",
-      "reason": "Outbox milestone: account-safe offline capture. Scope limited to web/src/. Excludes web/e2e, web/android, web/ios and factory/. Written by an agent as a proposal only. Authorises nothing until the owner sets status to approved and enters their own name in approved_by, on main."
+      "status": "approved",
+      "approved_by": "ParthibanRajasekaran",
+      "reason": "Outbox milestone: account-safe offline capture. Scope limited to web/src/ only. Excludes web/e2e, web/android, web/ios, factory/, policy/, and this approvals file. Owner approval given in the owner's instruction in this session ('I also approve the narrow web/src/ authorization described in PR #5 ... approved_by: ParthibanRajasekaran and status: approved')."
     }
   ]
 }
