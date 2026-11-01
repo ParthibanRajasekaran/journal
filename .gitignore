@@ -42,3 +42,6 @@ web/dist/
 # Playwright output
 web/test-results/
 web/playwright-report/
+
+# Factory runtime state (ledger, locks, run workspaces), local to each checkout
+.factory-local/
