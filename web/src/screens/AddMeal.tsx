@@ -241,12 +241,18 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
   const hasEstimate = provider !== null;
   const unsaved = describing.trim().length > 0 || hasEstimate || name.trim().length > 0;
 
+  // Leaving the form on purpose ends the save attempt, so a new identical meal gets a new id.
+  // A retry of the same save, without leaving, keeps the id.
+  function leave() {
+    attemptRef.current = null;
+    writeStoredAttempt(owner, null);
+    writeDraft(owner, null);
+    onCancel();
+  }
+
   function cancel() {
     if (unsaved) setConfirmCancel(true);
-    else {
-      writeDraft(owner, null);
-      onCancel();
-    }
+    else leave();
   }
 
   function macroFields() {
@@ -401,10 +407,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
             <button
               type="button"
               className="danger-solid"
-              onClick={() => {
-                writeDraft(owner, null);
-                onCancel();
-              }}
+              onClick={leave}
             >
               Discard
             </button>

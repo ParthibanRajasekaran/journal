@@ -206,9 +206,20 @@ async def create_meal(
     try:
         await session.commit()
     except IntegrityError as exc:
-        # A concurrent request with the same key won the race. Treat this as a replay.
+        # A concurrent request with the same key won the race. Answer as the sequential path would:
+        # the same meal is a replay (200), a different meal is a conflict (409).
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Retry the request.") from exc
+        winner = (
+            await session.execute(
+                select(Meal).where(Meal.user_id == user_id, Meal.client_id == body.client_id)
+            )
+        ).scalar_one_or_none()
+        if winner is None:
+            raise HTTPException(status_code=409, detail="Retry the request.") from exc
+        if not _same_content(winner, body):
+            raise HTTPException(status_code=409, detail="This key was used for a different meal.") from exc
+        response.status_code = 200
+        return _meal_out(winner)
     await session.refresh(meal)
     response.headers["Location"] = f"/api/v1/meals/{meal.id}"
     return _meal_out(meal)

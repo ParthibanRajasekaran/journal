@@ -200,3 +200,33 @@ def test_two_tabs_sending_the_same_meal_store_one_meal(
     assert second.status_code in (200, 201)
     assert second.json()["id"] == first.json()["id"]
     assert _saved_client_ids(client) == {body["client_id"]}
+
+
+def test_re_registration_after_deletion_gets_a_new_account_and_refuses_the_old_queue(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A deleted account's queued meal must never land on a later account, even one that signs in with the
+    # same Google subject again.
+    owner_a = _sign_in_as(client, monkeypatch, "sub-a")
+    assert client.delete("/api/v1/me", headers=CSRF).status_code == 204
+
+    owner_again = _sign_in_as(client, monkeypatch, "sub-a")
+
+    assert owner_again != owner_a
+    old_body = _body()
+    assert _create(client, old_body, owner_a).status_code == 409
+    assert old_body["client_id"] not in _saved_client_ids(client)
+    fresh_body = _body()
+    assert _create(client, fresh_body, owner_again).status_code == 201
+
+
+def test_one_account_never_sees_another_accounts_meals(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner_a = _sign_in_as(client, monkeypatch, "sub-a")
+    body_a = _body()
+    assert _create(client, body_a, owner_a).status_code == 201
+
+    _sign_in_as(client, monkeypatch, "sub-b")
+
+    assert body_a["client_id"] not in _saved_client_ids(client)
