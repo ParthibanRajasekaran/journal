@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { nativeAuth } from "../native";
+import { SignInCancelled } from "../native/auth";
+import { isNativePlatform, nativeSignInConfigured } from "../native/platform";
 
 // The server keeps the real record: the first sign-in of each account must confirm 18+, and the
 // confirmation is then kept for that account. This device flag only stops the question being asked
@@ -24,13 +27,31 @@ function writeDeviceFlag(on: boolean): void {
 }
 
 // Shown when sign-in cannot start, or when Google or the server sends the user back with a failure.
-export function SignIn() {
+export function SignIn({ onSignedIn }: { onSignedIn?: () => void }) {
   const [failed, setFailed] = useState(false);
   const [needsAdult, setNeedsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
   const [remembered, setRemembered] = useState(readDeviceFlag);
   const [ticked, setTicked] = useState(false);
   const adult = remembered || ticked;
+  // On a phone the Google sheet opens in the platform's own UI, through the SDK. In a browser the redirect is used.
+  const onDevice = isNativePlatform();
+  const native = onDevice && nativeSignInConfigured();
+
+  async function signInNatively() {
+    if (!adult) return;
+    if (ticked) writeDeviceFlag(true);
+    setBusy(true);
+    setFailed(false);
+    try {
+      await nativeAuth.signIn(adult);
+      onSignedIn?.();
+    } catch (err) {
+      setBusy(false);
+      // Backing out is not a failure. Anything else is shown as one.
+      if (!(err instanceof SignInCancelled)) setFailed(true);
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -77,23 +98,44 @@ export function SignIn() {
           </label>
         )}
 
-        <a
-          className={`google-btn ${adult ? "" : "is-disabled"}`}
-          href={adult ? `${api.signInUrl}?adult=1` : undefined}
-          aria-disabled={!adult}
-          // Stays reachable by keyboard while disabled, so its state can be heard and understood.
-          tabIndex={0}
-          aria-busy={busy}
-          onClick={(e) => {
-            if (!adult) return e.preventDefault();
-            // Remember the tick on this device before leaving, so the question is not asked again here.
-            if (ticked) writeDeviceFlag(true);
-            setBusy(true);
-          }}
-        >
-          <GoogleMark />
-          <span>{busy ? "Redirecting…" : "Continue with Google"}</span>
-        </a>
+        {onDevice && !native && (
+          <p className="error" role="alert">
+            Sign-in isn't set up in this build yet. Google sign-in on a phone uses the phone's own sign-in
+            sheet, and it is not available until the app is configured with its Google client IDs.
+          </p>
+        )}
+        {/* On a phone the redirect is never used: it would load Google sign-in inside the app's WebView. */}
+        {native && (
+          <button
+            type="button"
+            className={`google-btn ${adult && !busy ? "" : "is-disabled"}`}
+            disabled={!adult || busy}
+            aria-busy={busy}
+            onClick={signInNatively}
+          >
+            <GoogleMark />
+            <span>{busy ? "Signing in…" : "Continue with Google"}</span>
+          </button>
+        )}
+        {!onDevice && (
+          <a
+            className={`google-btn ${adult ? "" : "is-disabled"}`}
+            href={adult ? `${api.signInUrl}?adult=1` : undefined}
+            aria-disabled={!adult}
+            // Stays reachable by keyboard while disabled, so its state can be heard and understood.
+            tabIndex={0}
+            aria-busy={busy}
+            onClick={(e) => {
+              if (!adult) return e.preventDefault();
+              // Remember the tick on this device before leaving, so the question is not asked again here.
+              if (ticked) writeDeviceFlag(true);
+              setBusy(true);
+            }}
+          >
+            <GoogleMark />
+            <span>{busy ? "Redirecting…" : "Continue with Google"}</span>
+          </a>
+        )}
 
         <p className="muted fine-print">We use your Google account only to confirm it's you.</p>
       </section>

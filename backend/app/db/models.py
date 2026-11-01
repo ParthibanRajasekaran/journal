@@ -138,3 +138,25 @@ class AiKey(Base):
     validated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class NativeAttempt(Base):
+    """One native sign-in attempt. The client holds the secret; the server keeps only its hash.
+
+    The nonce is stored as plaintext. It is sent to Google in the login request and comes back
+    inside the ID token, so it is a binding value, not a credential. The attempt is consumed by a
+    single conditional UPDATE.
+    """
+
+    __tablename__ = "native_attempts"
+
+    attempt_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    nonce: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(16))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('pending', 'consumed', 'cancelled')", name="native_attempts_state_known"
+        ),
+    )

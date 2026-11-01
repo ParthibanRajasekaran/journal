@@ -59,3 +59,8 @@ factory:
 .PHONY: native-proposal
 native-proposal:
 	python3 -m unittest discover -s docs/factory/proposals/native-auth -p "test_*.py"
+
+# One reproducible command for every required check (see scripts/verify.sh). Refuses a dirty tree.
+.PHONY: verify
+verify:
+	./scripts/verify.sh

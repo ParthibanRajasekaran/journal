@@ -59,4 +59,4 @@ def run[T](operation: Callable[[AsyncEngine], Awaitable[T]]) -> T:
 
 async def truncate_all(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE meals, users RESTART IDENTITY CASCADE"))
+        await conn.execute(text("TRUNCATE meals, users, native_attempts RESTART IDENTITY CASCADE"))

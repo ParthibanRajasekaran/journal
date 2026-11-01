@@ -21,4 +21,31 @@ pending is claimed as working.
 | Same flow on iOS simulator | iOS simulator | pending | Repeat the flow | `ios/` move, dependency approval |
 | Same flow on a physical iPhone | iOS device | pending | Repeat the flow | an Apple signing identity and provisioning, which do not exist (zero valid identities) |
 
+## Status after the native spike (1 November 2026)
+
+| Claim | Environment | Status | Evidence |
+|---|---|---|---|
+| Attempt model rules and transaction rollback (SQLite model) | Python | demonstrated | `make native-proposal`: 16 tests |
+| Attempt binding, missing/wrong/expired/consumed, cancel, retry, rollback, concurrency on **PostgreSQL** | PostgreSQL 18 test database on 127.0.0.1 | demonstrated (locally signed test tokens) | `backend/tests/test_native_auth.py`: 17 tests, including 12 concurrent consumptions yielding exactly one |
+| Rollback of consumption, user and session together, on PostgreSQL | PostgreSQL | demonstrated (simulated failure, not a killed process) | `test_a_failed_session_rolls_back_the_consumption_and_the_user`; a mutation that commits on failure makes it fail |
+| Bearer sessions: create and reopen a meal, account isolation, CSRF still required on writes | PostgreSQL + API | demonstrated | `test_bearer_sessions_create_reopen_and_stay_isolated_per_account`, `test_a_bearer_token_does_not_bypass_the_csrf_header_on_writes` |
+| Refresh rotation, reuse revokes the family, logout revokes | PostgreSQL + API | demonstrated | `test_refresh_rotates_reuse_revokes_and_logout_ends_the_session`, `test_logout_revokes_the_native_session` |
+| Client: nonce passed to the SDK, cancellation cancels the attempt, refused completion stores nothing, restore, single refresh, sign-out clears first | Web unit tests, injected device adapters | demonstrated (logic only, no device) | `web/src/native/auth.test.ts`: 16 tests |
+| Client: bearer header used, 401 renews and retries with the new token, logout routes to native | Web unit tests | demonstrated (logic only) | `web/src/api.test.ts` native block |
+| Plugin API and types used by the adapter | Pinned package 8.7.5 | demonstrated against published types | `npx tsc --noEmit` passes with the adapter |
+| Android app builds with both pinned plugins | Gradle, JDK 21, debug APK | demonstrated | `assembleDebug` succeeds; APK no longer requests `USE_BIOMETRIC` (the plugin's unused permission is removed by an override) |
+| Android app launches and reaches sign-in | Emulator `google_apis_playstore` | **pending** | Not run in this checkpoint |
+| Real Google ID token: audience, authorised party, nonce echo, expiry | Android emulator with real Google account | **pending owner OAuth clients and consent** | `OAUTH-CHECKLIST.md` |
+| Credential Manager behaviour with a restored or cached credential | Android emulator | **pending** | As above |
+| iOS app builds for the simulator | Xcode 27.1 via DEVELOPER_DIR | **blocked** | `xcodebuild` stalls while resolving Swift packages (checkout of `keychain-swift` never completes; git clones of the same repository complete). Reproduced three times with a fresh package cache. Needs an Xcode-side check, outside the agent's reach. |
+| iOS simulator sign-in and reopen | iOS simulator | **blocked** | Depends on the simulator build and an iOS OAuth client |
+| iOS physical device | iPhone | **pending** | No valid code-signing identity exists (zero valid identities) |
+| Physical Android phone | Android device | **pending** | No phone attached |
+| Secure session storage across relaunch on device | Android emulator / phone | **pending** | Keychain and Keystore behaviour not exercised on a device |
+| Account switch without outbox replay, on device | Emulator / phone | **pending** | The rule is covered by web unit tests (`offline.test.ts`), not by a device run |
+| Offline capture then reconnect, on device | Emulator / phone | **pending** | Not run |
+
+Nothing marked pending is claimed as working. The attempt design is supported by the server tests above; the real
+Google token behaviour is not.
+
 No row is a release claim. Passing a row shows evidence for a design decision, not that the app is approved.

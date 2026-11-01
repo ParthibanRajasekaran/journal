@@ -27,7 +27,9 @@ Response `201`:
 - `attempt_secret` is kept only in secure storage, in memory during the login, and is sent only to
   `/complete` and `/cancel`. It is never sent to Google.
 - `nonce` is passed to the Google SDK as `GoogleLoginOptions.nonce`. The server stores `sha256(nonce)`.
-- The server stores `sha256(attempt_secret)`, `sha256(nonce)`, `expires_at = now + 300 s`, and `state = pending`.
+- The server stores `sha256(attempt_secret)`, the nonce **as plaintext** (corrected here: `verify_id_token` compares
+  the token's claim with the expected value directly, and the nonce is not a credential; it is sent to Google and
+  returned in the token), `expires_at = now + 300 s`, and `state = pending`.
 - Expiry: 300 seconds. **Proven** in the model (`test_an_expired_attempt_is_refused`).
 
 ### `POST /api/v1/auth/native/attempts/complete`
