@@ -1,0 +1,59 @@
+{
+  "adapter": "dry-run",
+  "base_sha": "6af6acc0595bcc69340a8d7180bc2eeb29436f9e",
+  "candidate_sha": "74437e9efa3ac49c3ef7007b17ddaeea53e2a716",
+  "config_hash": "30cec721412bcb53cd0f7888a8c13ec4cd150a41b799815762023e27a403cb64",
+  "gates": [],
+  "generated_at": 1793574913.167808,
+  "review": null,
+  "run_id": "run-56ce606743e4",
+  "scope": {
+    "changed": [
+      "backend/app/routes/meals.py",
+      "backend/tests/test_expected_account.py",
+      "backend/tests/test_meal_concurrency.py",
+      "docs/openapi.yaml",
+      "docs/outbox-storage-limits.md",
+      "web/src/App.tsx",
+      "web/src/api.test.ts",
+      "web/src/api.ts",
+      "web/src/attempt.test.ts",
+      "web/src/attempt.ts",
+      "web/src/offline.test.ts",
+      "web/src/offline.ts",
+      "web/src/outbox-fixes.test.ts",
+      "web/src/screens/AddMeal.inflight.test.ts",
+      "web/src/screens/AddMeal.tsx",
+      "web/src/screens/Settings.tsx",
+      "web/src/screens/SignIn.tsx",
+      "web/src/screens/Today.tsx",
+      "web/src/session.ts",
+      "web/src/vite-env.d.ts"
+    ],
+    "violations": [
+      "protected path changed: docs/openapi.yaml"
+    ]
+  },
+  "spend": {
+    "cap_usd": 1.0,
+    "committed_usd": 0.0,
+    "open_or_orphaned": 0,
+    "reservations": 0,
+    "unknown_spend_entries": 0
+  },
+  "ticket_hash": "9317555abc1adb01af5b252736e7f65a028a5a1c80380a2a053d689838cd3b81",
+  "ticket_id": "JRN-OUTBOX-001",
+  "worktree": {
+    "after": {
+      "dirty": [],
+      "head": "74437e9efa3ac49c3ef7007b17ddaeea53e2a716",
+      "tree": "2b5d7855ac18680fceed2450c09a65731226fcf6"
+    },
+    "before": {
+      "dirty": [],
+      "head": "74437e9efa3ac49c3ef7007b17ddaeea53e2a716",
+      "tree": "2b5d7855ac18680fceed2450c09a65731226fcf6"
+    },
+    "mutated": false
+  }
+}

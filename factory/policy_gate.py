@@ -82,8 +82,11 @@ def approved_prefixes(repo: Path, ref: str) -> tuple[str, ...]:
     prefixes = []
     for entry in entries:
         if entry.get("status") == "approved" and isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip():
-            if isinstance(entry.get("prefix"), str):
-                prefixes.append(entry["prefix"])
+            prefix = entry.get("prefix")
+            # An empty or non-string prefix would authorise every path. Refuse the whole file instead.
+            if not isinstance(prefix, str) or not prefix.strip() or prefix.strip() in ("/", "*", "**"):
+                raise FactoryError(f"an approved exception in {APPROVALS_PATH} has no usable prefix at {ref[:12]}")
+            prefixes.append(prefix)
     return tuple(prefixes)
 
 
