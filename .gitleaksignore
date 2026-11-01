@@ -4,3 +4,18 @@ ba1cd2244d62175a357f12fde17109326128ef5e:docs/adr/0001-backend-and-api.md:generi
 
 # Test-only fixed encryption key in backend/tests/conftest.py. It protects nothing.
 fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-key:13
+
+# Browser storage key name for the quarantined legacy queue (web/src/offline.ts line 10). Not a credential.
+7b9bddd84cd8622a406da354dfaf48461677d625:web/src/offline.ts:generic-api-key:10
+
+# Same reviewed false positive as above, after the outbox rewrite moved the quarantine key to line 11.
+30954a5206f1248c593a52a52438e6bd1e323edd:web/src/offline.ts:generic-api-key:11
+
+# Same reviewed storage-key false positive, in the web-only outbox candidate commit (line 11).
+40508e263ea347a731f13b93f522fa296c80b89e:web/src/offline.ts:generic-api-key:11
+
+# Same reviewed storage-key false positive, in the outbox candidate commit 8a4d74f (line 11).
+8a4d74f6a3943fbfcf439338f83411c5e5b50e17:web/src/offline.ts:generic-api-key:11
+
+# Historical only: a plainly fake attempt value in the native sign-in test fixture (commit 00a00a1, web/src/native/auth.test.ts line 10). The value was renamed in 95f1006; history is not rewritten.
+00a00a1e377144f1b0c7619f4a56058ea9d3dced:web/src/native/auth.test.ts:generic-api-key:10
