@@ -1,0 +1,10 @@
+{
+  "exceptions": [
+    {
+      "prefix": "web/src/",
+      "status": "approved",
+      "approved_by": "ParthibanRajasekaran",
+      "reason": "Outbox milestone: account-safe offline capture. Scope limited to web/src/ only. Excludes web/e2e, web/android, web/ios, factory/, policy/, and this approvals file. Owner approval given in the owner's instruction in this session ('I also approve the narrow web/src/ authorization described in PR #5 ... approved_by: ParthibanRajasekaran and status: approved')."
+    }
+  ]
+}
