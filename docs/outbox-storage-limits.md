@@ -46,8 +46,9 @@ Both cases are inherent to a single browser storage area. They are not fixed by 
   has no compare-and-set. The later write wins.
 - **Two tabs sending the same queued meal at the same instant** send two requests. The server stores one meal, and
   both responses carry the same meal. The duplicate request is not a duplicate meal.
-- **A deliberate second identical meal** entered in the same minute, without leaving the form, reuses the first
-  `client_id` and is stored once. Leaving the form, or entering the meal again after cancelling, gives a new id.
+- **A deliberate second identical meal** entered in the same browser tab session, without leaving the form first, reuses
+  the first `client_id` and is stored once. Leaving the form (Cancel or Discard, once no save is in flight), or a successful
+  save, releases the id, so the next identical meal gets a new one.
 
 ## Tests that cover this
 

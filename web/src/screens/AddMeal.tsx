@@ -244,6 +244,8 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
   // Leaving the form on purpose ends the save attempt, so a new identical meal gets a new id.
   // A retry of the same save, without leaving, keeps the id.
   function leave() {
+    // While a save is in flight its outcome is still unknown, so the id must be kept.
+    if (saving) return;
     attemptRef.current = null;
     writeStoredAttempt(owner, null);
     writeDraft(owner, null);
@@ -408,6 +410,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
               type="button"
               className="danger-solid"
               onClick={leave}
+              disabled={saving}
             >
               Discard
             </button>
@@ -416,7 +419,7 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
       ) : (
         <div className="form-actions">
           {!hasEstimate && !manual && <p id="save-hint" className="hint muted">Estimate a meal or enter the numbers first.</p>}
-          <button type="button" className="ghost" onClick={cancel}>Cancel</button>
+          <button type="button" className="ghost" onClick={cancel} disabled={saving}>Cancel</button>
           <button
             type="submit"
             className="primary"
