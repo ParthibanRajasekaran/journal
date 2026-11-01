@@ -258,3 +258,81 @@ class ScopeWithExemption(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HardenedInputs(unittest.TestCase):
+    """Refusals found in review: an empty policy prefix, a digest with a trailing newline, and git failures."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self._tmp.name)
+        git(self.repo, "init", "-q")
+        self.base0 = write_commit(self.repo, {OPENAPI: "paths: {}\n", APPROVALS: approvals([])}, "base")
+        self.candidate = write_commit(self.repo, {OPENAPI: REVIEWED}, "candidate")
+        self.digest = diff_digest(self.repo, self.base0, self.candidate, OPENAPI)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def base_with(self, text: str) -> str:
+        git(self.repo, "checkout", "-q", self.base0)
+        return write_commit(self.repo, {APPROVALS: text}, "approvals under test")
+
+    def test_a_digest_with_a_trailing_newline_is_not_accepted(self) -> None:
+        base = self.base_with(approvals([{"path": OPENAPI, "diff_sha256": self.digest + "\n", "status": "approved",
+                                          "approved_by": "owner-name"}]))
+        with self.assertRaises(FactoryError):
+            approved_file_digests(self.repo, base)
+
+    def test_a_git_failure_becomes_a_factory_error(self) -> None:
+        with self.assertRaises(FactoryError):
+            diff_digest(self.repo, "0" * 40, self.candidate, OPENAPI)
+
+    def test_the_environment_cannot_change_the_digest(self) -> None:
+        import os
+        from unittest import mock
+
+        with mock.patch.dict(os.environ, {"GIT_DIFF_OPTS": "--unified=0"}):
+            self.assertEqual(diff_digest(self.repo, self.base0, self.candidate, OPENAPI), self.digest)
+
+
+class PolicyPrefixes(unittest.TestCase):
+    """An approved policy exception with an empty or broad prefix would authorise every path. It must refuse the run."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self._tmp.name)
+        git(self.repo, "init", "-q")
+        self.base = write_commit(self.repo, {APPROVALS: "{}"}, "base")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def prefixes_for(self, entries: list[dict]) -> tuple:
+        from factory.policy_gate import approved_prefixes
+
+        base = write_commit(self.repo, {APPROVALS: json.dumps({"exceptions": entries})}, "policy approvals")
+        return approved_prefixes(self.repo, base)
+
+    def test_an_empty_approved_prefix_stops_the_run(self) -> None:
+        with self.assertRaises(FactoryError):
+            self.prefixes_for([{"prefix": "", "status": "approved", "approved_by": "owner-name"}])
+
+    def test_a_broad_approved_prefix_stops_the_run(self) -> None:
+        for broad in ("/", "*", "**"):
+            with self.subTest(prefix=broad):
+                with self.assertRaises(FactoryError):
+                    self.prefixes_for([{"prefix": broad, "status": "approved", "approved_by": "owner-name"}])
+
+    def test_a_non_string_approved_prefix_stops_the_run(self) -> None:
+        with self.assertRaises(FactoryError):
+            self.prefixes_for([{"prefix": 7, "status": "approved", "approved_by": "owner-name"}])
+
+    def test_a_useful_approved_prefix_is_kept(self) -> None:
+        self.assertEqual(
+            self.prefixes_for([{"prefix": "web/src/", "status": "approved", "approved_by": "owner-name"}]),
+            ("web/src/",),
+        )
+
+    def test_an_unapproved_entry_with_an_empty_prefix_is_ignored(self) -> None:
+        self.assertEqual(self.prefixes_for([{"prefix": "", "status": "pending-owner-approval", "approved_by": ""}]), ())

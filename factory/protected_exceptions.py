@@ -19,15 +19,17 @@ Approvals are read from the base commit, so a candidate cannot approve its own c
 FactoryError, which stops the run, including an approved entry whose digest is malformed. Entries that are unapproved,
 unnamed, or for another ticket are ignored.
 
-The digest pins the git settings that change diff output (see diff_digest). Attribute-driven drivers from a repository's
-.gitattributes or a local attributes file are not pinned; a candidate whose file uses one fails closed, because its digest
-will not match the owner's.
+The digest pins the git settings that change diff output (see diff_digest), and removes the environment variables that
+change it. Attribute-driven diff drivers are not pinned. The digest is computed in the repository the factory runs in, not
+in a candidate's worktree, so the effect of a candidate's own attributes is not established by this module. Only a binary
+attribute set in the factory's repository has been shown to change the digest, and it does so in the fail-closed direction.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -38,7 +40,9 @@ from factory.policy_gate import APPROVALS_PATH, read_at
 from factory.scope import check_scope, matches
 
 KEY = "protected_file_exceptions"
-_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+# Environment variables that change how git renders a diff, or which objects it reads. Removed for the digest.
+_DIFF_ENV = {"GIT_DIFF_OPTS", "GIT_EXTERNAL_DIFF", "GIT_NO_REPLACE_OBJECTS", "GIT_DIFF_PATH_COUNTER"}
+_DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
 def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -> dict[str, str]:
@@ -69,7 +73,7 @@ def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -
         if not (isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip()):
             continue
         # An approved entry with a malformed digest is an error, not a silent no-op.
-        if not (isinstance(path, str) and isinstance(digest, str) and _DIGEST.match(digest)):
+        if not (isinstance(path, str) and isinstance(digest, str) and _DIGEST.fullmatch(digest)):
             raise FactoryError(f"approved entry for {path!r} has a malformed diff_sha256 at {base[:12]}")
         if path == APPROVALS_PATH:
             continue
@@ -88,7 +92,10 @@ def diff_digest(repo: Path, base: str, head: str, path: str) -> str:
     The options are pinned, so the digest does not depend on local git configuration: literal pathspecs, no textconv,
     a fixed diff algorithm and context, full object ids, fixed a/ and b/ prefixes, and no rename detection. The owner computes the digest with this same function.
     """
-    result = subprocess.run(
+    # Environment overrides that change diff output are removed, so the digest cannot be changed from outside.
+    env = {k: v for k, v in os.environ.items() if k not in _DIFF_ENV}
+    try:
+        result = subprocess.run(
         [
             "git", "--literal-pathspecs",
             "-c", "diff.noprefix=false",
@@ -101,8 +108,10 @@ def diff_digest(repo: Path, base: str, head: str, path: str) -> str:
             "--indent-heuristic", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames",
             base, head, "--", path,
         ],
-        cwd=repo, check=True, capture_output=True,
+        cwd=repo, check=True, capture_output=True, env=env,
     )
+    except (subprocess.CalledProcessError, OSError) as exc:
+        raise FactoryError(f"cannot compute the diff digest for {path} between {base[:12]} and {head[:12]}") from exc
     # Hashed as bytes: no decoding, so a non-UTF-8 byte in the diff cannot crash the run, and no newline translation.
     return hashlib.sha256(result.stdout).hexdigest()
 
