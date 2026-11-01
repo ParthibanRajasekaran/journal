@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from factory.protected_exceptions import exempted_paths
+from factory.protected_exceptions import scope_violations
 from factory import gitops, state
 from factory.common import FactoryError, now, read_json, sha256_text, write_json
 from factory.controller.decision import decide
@@ -382,10 +382,11 @@ class Controller:
         candidate = before["head"]
         changed = gitops.changed_paths(workdir, base)
         protected = list(ticket.get("protected_paths", [])) + list(self.project.get("protected_paths", [])) + [APPROVALS_PATH]
-        violations = check_scope(changed, ticket["allowed_paths"], protected)
-        # A protected file may be exempted only for the exact diff the owner approved at base. See protected_exceptions.py.
-        exempt = exempted_paths(self.repo, base, candidate, changed, protected)
-        violations = [v for v in violations if not any(v == f"protected path changed: {p}" for p in exempt)]
+        # A protected file may be exempted only for the exact diff the owner approved at base, for this ticket,
+        # and only where the ticket also allows it. See protected_exceptions.py.
+        violations = scope_violations(
+            self.repo, base, candidate, changed, ticket["allowed_paths"], protected, ticket.get("id"),
+        )
         if not changed:
             violations.append("the candidate changes no files")
         base_policy = load_policy_at(self.repo, base)

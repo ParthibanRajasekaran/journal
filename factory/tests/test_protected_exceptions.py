@@ -195,3 +195,49 @@ class FailClosed(unittest.TestCase):
         self.assertEqual(exempted_paths(self.repo, base, self.candidate, ["docs/adr/0001.md"], ["docs/adr/**"]), set())
 
 
+
+
+class ScopeWithExemption(unittest.TestCase):
+    """The controller's scope check, with the exemption applied. An exempt path is still subject to the ticket's allowed paths."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self._tmp.name)
+        git(self.repo, "init", "-q")
+        self.base0 = write_commit(self.repo, {OPENAPI: "paths: {}\n", APPROVALS: approvals([])}, "base")
+        self.candidate = write_commit(self.repo, {OPENAPI: REVIEWED}, "candidate")
+        self.digest = diff_digest(self.repo, self.base0, self.candidate, OPENAPI)
+        git(self.repo, "checkout", "-q", self.base0)
+        self.base = write_commit(
+            self.repo,
+            {APPROVALS: approvals([{"path": OPENAPI, "diff_sha256": self.digest, "status": "approved",
+                                    "approved_by": "owner-name", "ticket_id": "JRN-OUTBOX-001"}])},
+            "approval",
+        )
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def scope(self, allowed: list[str], ticket_id: str | None = "JRN-OUTBOX-001") -> list[str]:
+        return scope_violations(self.repo, self.base, self.candidate, [OPENAPI], allowed, PROTECTED, ticket_id)
+
+    def test_an_exempt_path_outside_the_ticket_allowed_paths_is_still_refused(self) -> None:
+        self.assertEqual(self.scope(["web/src/**"]), [f"outside the ticket's allowed paths: {OPENAPI}"])
+
+    def test_an_exempt_path_the_ticket_allows_passes(self) -> None:
+        self.assertEqual(self.scope(["docs/openapi.yaml"]), [])
+
+    def test_an_entry_bound_to_another_ticket_does_not_exempt(self) -> None:
+        self.assertEqual(
+            self.scope(["docs/openapi.yaml"], ticket_id="JRN-OTHER-002"),
+            [f"protected path changed: {OPENAPI}"],
+        )
+
+    def test_the_digest_does_not_depend_on_local_diff_settings(self) -> None:
+        git(self.repo, "config", "diff.noprefix", "true")
+        git(self.repo, "config", "diff.mnemonicPrefix", "true")
+        git(self.repo, "config", "core.abbrev", "7")
+        self.assertEqual(diff_digest(self.repo, self.base0, self.candidate, OPENAPI), self.digest)
+
+
+from factory.protected_exceptions import scope_violations  # noqa: E402

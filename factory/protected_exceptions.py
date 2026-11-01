@@ -27,13 +27,13 @@ from pathlib import Path
 from factory import gitops
 from factory.common import FactoryError
 from factory.policy_gate import APPROVALS_PATH, read_at
-from factory.scope import matches
+from factory.scope import check_scope, matches
 
 KEY = "protected_file_exceptions"
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
-def approved_file_digests(repo: Path, base: str) -> dict[str, str]:
+def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -> dict[str, str]:
     """Path -> digest for each exception the owner approved at the base commit.
 
     Malformed data raises FactoryError. Entries that are not approved, have no named approver, name the approvals
@@ -64,6 +64,9 @@ def approved_file_digests(repo: Path, base: str) -> dict[str, str]:
             continue
         if path == APPROVALS_PATH:
             continue
+        # An entry may name one ticket. Such an entry never applies to another ticket.
+        if "ticket_id" in entry and entry["ticket_id"] != ticket_id:
+            continue
         if path in approved and approved[path] != digest:
             raise FactoryError(f"conflicting approved digests for {path} at {base[:12]}")
         approved[path] = digest
@@ -71,14 +74,28 @@ def approved_file_digests(repo: Path, base: str) -> dict[str, str]:
 
 
 def diff_digest(repo: Path, base: str, head: str, path: str) -> str:
-    """SHA-256 of the diff for one path between two commits. The same command is used to approve and to check."""
-    text = gitops.git(repo, "diff", "--no-ext-diff", "--no-color", base, head, "--", path)
+    """SHA-256 of the diff for one path between two commits.
+
+    The options are pinned, so the digest does not depend on local git configuration: literal pathspecs, full object
+    ids, fixed a/ and b/ prefixes, and no rename detection. The owner computes the digest with this same function.
+    """
+    text = gitops.git(
+        repo,
+        "--literal-pathspecs",
+        "-c", "diff.noprefix=false",
+        "-c", "diff.mnemonicPrefix=false",
+        "diff", "--no-ext-diff", "--no-color", "--full-index",
+        "--src-prefix=a/", "--dst-prefix=b/", "--no-renames",
+        base, head, "--", path,
+    )
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def exempted_paths(repo: Path, base: str, head: str, changed: list[str], protected: list[str]) -> set[str]:
+def exempted_paths(
+    repo: Path, base: str, head: str, changed: list[str], protected: list[str], ticket_id: str | None = None
+) -> set[str]:
     """Protected paths in this change whose exact diff the owner approved. Everything else stays refused."""
-    approved = approved_file_digests(repo, base)
+    approved = approved_file_digests(repo, base, ticket_id)
     exempt: set[str] = set()
     for path in changed:
         if path == APPROVALS_PATH or not matches(path, protected) or path not in approved:
@@ -86,3 +103,26 @@ def exempted_paths(repo: Path, base: str, head: str, changed: list[str], protect
         if diff_digest(repo, base, head, path) == approved[path]:
             exempt.add(path)
     return exempt
+
+
+def scope_violations(
+    repo: Path,
+    base: str,
+    head: str,
+    changed: list[str],
+    allowed: list[str],
+    protected: list[str],
+    ticket_id: str | None,
+) -> list[str]:
+    """The controller's scope check, with the exemption applied.
+
+    An exempt path is still subject to the ticket's allowed paths. The exemption removes only the protected-path
+    message, and never removes an "outside the ticket's allowed paths" message.
+    """
+    violations = check_scope(changed, allowed, protected)
+    exempt = exempted_paths(repo, base, head, changed, protected, ticket_id)
+    kept = [v for v in violations if not any(v == f"protected path changed: {p}" for p in exempt)]
+    for path in sorted(exempt):
+        if not matches(path, allowed):
+            kept.append(f"outside the ticket's allowed paths: {path}")
+    return kept
