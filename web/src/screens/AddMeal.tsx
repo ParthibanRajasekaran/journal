@@ -5,7 +5,7 @@ import { MealTimePicker, mealFor, nowRounded } from "./TimePicker";
 import { KeyHelp } from "./KeyHelp";
 import { enqueue } from "../offline";
 import { sessionOwner } from "../session";
-import { Attempt, attemptFor } from "../attempt";
+import { Attempt, attemptFor, readStoredAttempt, writeStoredAttempt } from "../attempt";
 
 // The meal being typed is kept for this browser session, so a reload or a detour to add a key does
 // not lose it. It is cleared once the meal is saved or the user cancels. The draft belongs to the
@@ -61,7 +61,7 @@ const FIELD_LABEL: Record<keyof Values, string> = { calories: "kcal", protein_g:
 export function AddMeal({ owner, day, onDone, onCancel }: Props) {
   const [draft] = useState(() => readDraft(owner));
   // The id of the Save attempt in progress. See attempt.ts.
-  const attemptRef = useRef<Attempt | null>(null);
+  const attemptRef = useRef<Attempt | null>(readStoredAttempt(owner));
   const [name, setName] = useState(draft?.name ?? "");
   const [start] = useState(nowRounded);
   const [mealType, setMealType] = useState<Meal["meal_type"]>(draft?.mealType ?? mealFor(start));
@@ -205,12 +205,14 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
     // be stored or sent twice.
     const attempt = attemptFor(attemptRef.current, JSON.stringify(fields), () => crypto.randomUUID());
     attemptRef.current = attempt;
+    writeStoredAttempt(owner, attempt);
     const meal: NewMeal = { client_id: attempt.id, ...fields };
     try {
       // The guard stops the save if this tab's session has moved to another account. The server check
       // (X-Journal-Expected-Account) is what protects against another tab changing the shared cookie.
       await api.createMeal(meal, () => sessionOwner() === owner, owner);
       attemptRef.current = null;
+      writeStoredAttempt(owner, null);
       writeDraft(owner, null);
       onDone();
     } catch (err) {
@@ -223,6 +225,8 @@ export function AddMeal({ owner, day, onDone, onCancel }: Props) {
           return;
         }
         attemptRef.current = null;
+        writeStoredAttempt(owner, null);
+      writeStoredAttempt(owner, null);
         writeDraft(owner, null);
         onDone();
         return;

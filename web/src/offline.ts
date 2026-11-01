@@ -21,7 +21,7 @@ export const OUTBOX_EVENT = "journal:outbox";
 const BACKOFF_BASE_MS = 30_000;
 const BACKOFF_MAX_MS = 10 * 60_000;
 export const GAVE_UP_REASON = "Couldn't reach Journal after several tries. Try again when you're online.";
-export const LIMITED_REASON = "Journal is limiting requests right now. It will try again, or you can try again now.";
+export const LIMITED_REASON = "Journal is limiting requests right now. Try again later.";
 
 // How long a transient failure waits before the next try: 30 s, 60 s, 2 min, 4 min, then 10 min at most.
 export function backoffMs(attempts: number): number {
@@ -218,40 +218,45 @@ export function discardOwner(owner: string): CommitResult {
   return mutate((entries) => entries.filter((e) => e.owner !== owner));
 }
 
-// Set when the account's removal was refused and the refusal could not be recorded either.
-let unrecordedCleanup: string | null = null;
+// Accounts whose removal was refused and could not be recorded on disk. Kept in memory only, so the
+// sign-in screen can still say so when the record itself cannot be written.
+const unrecordedCleanup = new Set<string>();
 
-function readDiscardRecord(): string | null {
+// Every account whose removal is still owed, as stored. Null when the record cannot be read at all.
+function readDiscardOwners(): string[] | null {
   const store = storage();
   if (!store) return null;
+  let raw: string | null;
   try {
-    const raw = store.getItem(DISCARD_KEY);
-    if (raw === null) return null;
-    const parsed = JSON.parse(raw) as { owner?: unknown };
-    return typeof parsed.owner === "string" ? parsed.owner : null;
+    raw = store.getItem(DISCARD_KEY);
+  } catch {
+    return null;
+  }
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every((owner) => typeof owner === "string")) return null;
+    return parsed as string[];
   } catch {
     return null;
   }
 }
 
-function recordDiscard(owner: string): boolean {
+// Writes the owed list and reads it back. A list keeps every owed account, so one deletion cannot erase
+// another account's obligation.
+function writeDiscardOwners(owners: string[]): boolean {
   const store = storage();
   if (!store) return false;
-  const text = JSON.stringify({ owner });
   try {
+    if (owners.length === 0) {
+      store.removeItem(DISCARD_KEY);
+      return store.getItem(DISCARD_KEY) === null;
+    }
+    const text = JSON.stringify(owners);
     store.setItem(DISCARD_KEY, text);
     return store.getItem(DISCARD_KEY) === text;
   } catch {
     return false;
-  }
-}
-
-function clearDiscardRecord(owner: string): void {
-  if (readDiscardRecord() !== owner) return;
-  try {
-    storage()?.removeItem(DISCARD_KEY);
-  } catch {
-    // A leftover record only means one more harmless retry, which finds nothing to remove.
   }
 }
 
@@ -261,34 +266,46 @@ export type DiscardResult = { ok: true } | { ok: false; recorded: boolean };
 // removal has been read back. On failure the obligation is recorded, so retryPendingDiscard() can
 // finish it after a restart; if even the record cannot be written, pendingDeviceCleanup() says so.
 export function discardAccountDurably(owner: string): DiscardResult {
-  const recorded = recordDiscard(owner);
+  const owed = readDiscardOwners();
+  const recorded = owed !== null && writeDiscardOwners([...owed.filter((o) => o !== owner), owner]);
   const result = discardOwner(owner);
   if (result.ok) {
-    clearDiscardRecord(owner);
-    if (unrecordedCleanup === owner) unrecordedCleanup = null;
+    if (owed !== null) writeDiscardOwners(owed.filter((o) => o !== owner));
+    unrecordedCleanup.delete(owner);
     return { ok: true };
   }
-  unrecordedCleanup = recorded ? null : owner;
+  if (recorded) unrecordedCleanup.delete(owner);
+  else unrecordedCleanup.add(owner);
   return { ok: false, recorded };
 }
 
-// Runs at start-up. Finishes a removal that an earlier run could not complete. Returns true when
+// Runs at start-up. Finishes every removal that an earlier run could not complete. Returns true when
 // nothing is left to remove.
 export function retryPendingDiscard(): boolean {
-  const owner = readDiscardRecord();
-  if (owner === null) return true;
-  const result = discardOwner(owner);
-  if (!result.ok) return false;
-  clearDiscardRecord(owner);
-  if (unrecordedCleanup === owner) unrecordedCleanup = null;
-  return true;
+  const owed = readDiscardOwners();
+  if (owed === null) return false;
+  let clean = true;
+  for (const owner of owed) {
+    if (discardOwner(owner).ok) {
+      writeDiscardOwners(readDiscardOwners()?.filter((o) => o !== owner) ?? []);
+      unrecordedCleanup.delete(owner);
+    } else {
+      clean = false;
+    }
+  }
+  return clean;
 }
 
-// What the sign-in screen must say about this device's data for a deleted account.
+// What the sign-in screen must say about this device's data for deleted accounts.
+//   "pending": an owed account still has queued meals here, and the next start will try again.
+//   "unrecorded": a removal was refused and could not be recorded, or the record cannot be read.
 export type DeviceCleanup = "none" | "pending" | "unrecorded";
 export function pendingDeviceCleanup(): DeviceCleanup {
-  if (readDiscardRecord() !== null) return "pending";
-  if (unrecordedCleanup !== null) return "unrecorded";
+  const owed = readDiscardOwners();
+  if (owed === null || unrecordedCleanup.size > 0) return "unrecorded";
+  const { entries } = readOutbox();
+  if (owed.some((owner) => entries.some((e) => e.owner === owner))) return "pending";
+  // A record whose meals are gone is stale. It is removed on the next start, and nothing is pending.
   return "none";
 }
 
@@ -357,7 +374,11 @@ async function sendPending(owner: string, send: SendMeal): Promise<number> {
   for (const entry of readQueue(owner)) {
     if (entry.state !== "pending") continue;
     // A transient failure set this entry aside until its delay has passed.
-    if (entry.retryAt !== undefined && entry.retryAt > Date.now()) continue;
+    if (entry.retryAt !== undefined && entry.retryAt > Date.now()) {
+      // Reached a little early (timers can fire first): arm a timer for the remainder, so it is not left waiting.
+      scheduleRetry(owner, entry.retryAt - Date.now(), send);
+      continue;
+    }
     // Check before every send: the session may have changed while an earlier request was in flight.
     if (!stillOwner()) break;
     try {

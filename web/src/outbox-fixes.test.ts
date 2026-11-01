@@ -240,3 +240,41 @@ describe("classification of the server's account refusal", () => {
     expect(readQueue(A)[0].state).toBe("pending");
   });
 });
+
+// Re-review, blocking finding: a second deletion on the same device must not erase the first account's
+// obligation. The owed list keeps both.
+describe("two deletions on one device", () => {
+  it("keeps the first account owed when a second deletion finishes", () => {
+    enqueue(A, meal("a1"));
+    enqueue(B, meal("b1"));
+    let refuseA = true;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      // Refuse only the write that would remove A's meal.
+      if (refuseA && key === OUTBOX_KEY && !value.includes("a1")) throw new Error("quota exceeded");
+      return originalSetItem.call(this, key, value);
+    });
+
+    expect(discardAccountDurably(A)).toEqual({ ok: false, recorded: true });
+    refuseA = false;
+    expect(discardAccountDurably(B)).toEqual({ ok: true });
+
+    expect(pendingDeviceCleanup()).toBe("pending");
+    expect(readQueue(A)).toHaveLength(1);
+    expect(retryPendingDiscard()).toBe(true);
+    expect(readQueue(A)).toEqual([]);
+    expect(pendingDeviceCleanup()).toBe("none");
+  });
+
+  it("does not report pending once an owed account has no meals left", () => {
+    enqueue(A, meal("a1"));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === OUTBOX_KEY && !value.includes("a1")) throw new Error("quota exceeded");
+      return originalSetItem.call(this, key, value);
+    });
+    expect(discardAccountDurably(A).ok).toBe(false);
+    vi.restoreAllMocks();
+    // The meals are removed by another path; the record is now stale.
+    discardEntry(A, "a1");
+    expect(pendingDeviceCleanup()).toBe("none");
+  });
+});
