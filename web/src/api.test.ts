@@ -177,3 +177,54 @@ describe("expected account on creates", () => {
     expect(init.headers["X-Journal-Expected-Account"]).toBeUndefined();
   });
 });
+
+describe("native bearer session", () => {
+  it("sends the native access token as a bearer header and no cookie-only assumption", async () => {
+    const { nativeBridge } = await import("./native/bridge");
+    const spy = mockFetch(() => new Response(JSON.stringify({ id: "u" }), { status: 200 }));
+    nativeBridge.accessToken = "native-access-token";
+    try {
+      await api.me();
+      const [, init] = spy.mock.calls[0];
+      expect(init.headers.Authorization).toBe("Bearer native-access-token");
+    } finally {
+      nativeBridge.accessToken = null;
+    }
+  });
+
+  it("on a 401 it renews through the native refresh and retries with the new token", async () => {
+    const { nativeBridge } = await import("./native/bridge");
+    const seen: string[] = [];
+    const replies = [new Response(null, { status: 401 }), new Response(JSON.stringify({ id: "u" }), { status: 200 })];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: { headers: Record<string, string> }) => {
+      seen.push(init.headers.Authorization ?? "");
+      return replies.shift() ?? new Response(null, { status: 500 });
+    }));
+    nativeBridge.accessToken = "old-token";
+    nativeBridge.refresh = async () => {
+      nativeBridge.accessToken = "new-token";
+      return true;
+    };
+    try {
+      expect((await api.me()).id).toBe("u");
+      expect(seen).toEqual(["Bearer old-token", "Bearer new-token"]);
+    } finally {
+      nativeBridge.accessToken = null;
+      nativeBridge.refresh = null;
+    }
+  });
+
+  it("logout ends a native session through the native module, not the cookie route", async () => {
+    const { nativeBridge } = await import("./native/bridge");
+    const signOut = vi.fn(async () => undefined);
+    const spy = mockFetch(() => new Response(null, { status: 204 }));
+    nativeBridge.signOut = signOut;
+    try {
+      await api.logout();
+      expect(signOut).toHaveBeenCalledTimes(1);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      nativeBridge.signOut = null;
+    }
+  });
+});

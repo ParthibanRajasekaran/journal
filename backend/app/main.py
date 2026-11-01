@@ -13,7 +13,7 @@ from app.config import Settings, get_settings
 from app.db.session import make_engine, make_session_factory
 from app.errors import install_problem_handlers
 from app.limits import WriteLimiter
-from app.routes import ai_keys, auth, days, estimates, health, me, meals
+from app.routes import ai_keys, auth, days, estimates, health, me, meals, native_auth
 
 API_PREFIX = "/api/v1"
 
@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(days.router)
     api.include_router(ai_keys.router)
     api.include_router(estimates.router)
+    api.include_router(native_auth.router)
     app.include_router(api)
     return app
 

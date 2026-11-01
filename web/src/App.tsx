@@ -7,6 +7,8 @@ import { Week } from "./screens/Week";
 import { Settings } from "./screens/Settings";
 import { localDay } from "./dates";
 import { flushQueue, quarantineLegacy, retryPendingDiscard } from "./offline";
+import { nativeAuth } from "./native";
+import { isNativePlatform } from "./native/platform";
 import { setSessionOwner } from "./session";
 
 type Screen = { name: "today"; day: string } | { name: "add"; day: string } | { name: "week" } | { name: "settings" };
@@ -22,8 +24,10 @@ export function App() {
 
   useEffect(() => {
     setProfile("loading");
-    api
-      .me()
+    // A phone restores its stored session first (the stored token is rotated), then loads the profile.
+    const boot = isNativePlatform() ? nativeAuth.restore() : Promise.resolve(false);
+    boot
+      .then(() => api.me())
       .then(setProfile)
       .catch((err: unknown) => {
         const signedOut = err instanceof ApiError && err.status === 401;
@@ -79,7 +83,7 @@ export function App() {
       </main>
     );
   }
-  if (profile === null) return <SignIn />;
+  if (profile === null) return <SignIn onSignedIn={() => setAttempt((n) => n + 1)} />;
   if (profile === "error") {
     return (
       <main className="shell">

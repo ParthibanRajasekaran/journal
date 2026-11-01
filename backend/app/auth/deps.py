@@ -45,10 +45,32 @@ def require_write(request: Request, user_id: str) -> None:
         raise HTTPException(status_code=429, detail="Too many changes. Try again in a minute.")
 
 
+def _bearer_token(request: Request) -> str | None:
+    """Native clients send the access token as a bearer token. Web keeps the HttpOnly cookie."""
+    scheme, _, value = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    return value.strip()
+
+
 async def current_user_id(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> str:
-    token = request.cookies.get(ACCESS_COOKIE)
+    # The browser cookie is tried first, then a native bearer token. Both must name an account that still exists.
+    token = request.cookies.get(ACCESS_COOKIE) or _bearer_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    try:
+        user_id = user_id_from_access_token(token, auth_key(request.app.state.settings))
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail="Sign in required.") from exc
+    # Deleted means deleted_at is set, as in the account routes. Soft-deleted accounts are refused too.
+    exists = (
+        await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    return user_id
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required.")
     try:
