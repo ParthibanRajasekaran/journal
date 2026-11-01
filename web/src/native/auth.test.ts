@@ -7,7 +7,7 @@ import type { NativeBridge } from "./bridge";
 function harness(overrides: Partial<NativeDeps> = {}) {
   let stored: string | null = null;
   const deps: NativeDeps = {
-    createAttempt: vi.fn(async () => ({ attempt_secret: "secret-attempt-1234567890", nonce: "nonce-abc", expires_in: 300 })),
+    createAttempt: vi.fn(async () => ({ attempt_secret: "fixture-attempt-value", nonce: "nonce-abc", expires_in: 300 })),
     cancelAttempt: vi.fn(async () => undefined),
     complete: vi.fn(async () => ({ access_token: "access-1", refresh_token: "refresh-1", expires_in: 900 })),
     refresh: vi.fn(async () => ({ access_token: "access-2", refresh_token: "refresh-2", expires_in: 900 })),
@@ -35,7 +35,7 @@ describe("native sign-in", () => {
     const h = harness();
     await h.auth.signIn(true);
     expect(h.deps.googleLogin).toHaveBeenCalledWith("nonce-abc");
-    expect(h.deps.complete).toHaveBeenCalledWith("secret-attempt-1234567890", "id-token-1", true);
+    expect(h.deps.complete).toHaveBeenCalledWith("fixture-attempt-value", "id-token-1", true);
     expect(h.bind.accessToken).toBe("access-1");
     expect(h.stored()).toBe("refresh-1");
   });
@@ -53,7 +53,7 @@ describe("native sign-in", () => {
       }),
     });
     await expect(h.auth.signIn(true)).rejects.toBeInstanceOf(SignInCancelled);
-    expect(h.deps.cancelAttempt).toHaveBeenCalledWith("secret-attempt-1234567890");
+    expect(h.deps.cancelAttempt).toHaveBeenCalledWith("fixture-attempt-value");
     expect(h.deps.complete).not.toHaveBeenCalled();
     expect(h.stored()).toBeNull();
     expect(h.bind.accessToken).toBeNull();
