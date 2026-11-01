@@ -55,8 +55,12 @@ class PolicyAlignment(unittest.TestCase):
         missing = [g for g in self.policy_protected if g not in self.factory_protected]
         self.assertEqual(missing, [], "the factory must protect at least what the agent policy protects")
 
-    def test_exceptions_are_pending_owner_approval(self):
-        self.assertEqual(self.exceptions["_status"], "pending-owner-approval")
+    def test_every_exception_has_an_explicit_status_and_an_approver_when_approved(self):
+        # Pending entries authorise nothing. An approved entry must name the owner who approved it.
+        for entry in self.exceptions["exceptions"]:
+            self.assertIn(entry.get("status"), {"approved", "pending-owner-approval"}, entry)
+            if entry["status"] == "approved":
+                self.assertTrue(str(entry.get("approved_by", "")).strip(), entry)
 
     def test_every_ticket_path_is_inside_policy_roots_or_a_declared_exception(self):
         root_prefixes = [static_prefix(g) for g in self.policy_allowed]

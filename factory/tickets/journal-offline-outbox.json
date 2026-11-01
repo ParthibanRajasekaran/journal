@@ -18,6 +18,7 @@
     "web/src/offline.test.ts",
     "web/src/offline.ts",
     "web/src/outbox-fixes.test.ts",
+    "web/src/screens/AddMeal.inflight.test.ts",
     "web/src/screens/AddMeal.tsx",
     "web/src/screens/Settings.tsx",
     "web/src/screens/SignIn.tsx",
