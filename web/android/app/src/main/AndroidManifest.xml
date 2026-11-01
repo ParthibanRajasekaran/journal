@@ -40,4 +40,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- The social-login plugin declares USE_BIOMETRIC, but its code never uses a biometric API. Removed here. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+    <!-- Declared by androidx.biometric 1.1.0, pulled in transitively by androidx.credentials 1.5.0 via the
+         journal-google-auth plugin. The app uses no fingerprint or biometric unlock, so the permission is removed. -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
 </manifest>

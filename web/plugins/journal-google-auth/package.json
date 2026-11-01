@@ -1,0 +1,33 @@
+{
+  "name": "@journal/google-auth",
+  "version": "1.0.0",
+  "description": "Google-only native sign-in for Journal: GoogleSignIn-iOS and Android Credential Manager. Returns an ID token; the backend verifies it.",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "ios/Sources",
+    "Package.swift",
+    "android",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3"
+  }
+}
