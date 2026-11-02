@@ -336,3 +336,34 @@ class PolicyPrefixes(unittest.TestCase):
 
     def test_an_unapproved_entry_with_an_empty_prefix_is_ignored(self) -> None:
         self.assertEqual(self.prefixes_for([{"prefix": "", "status": "pending-owner-approval", "approved_by": ""}]), ())
+
+
+class PrefixShape(unittest.TestCase):
+    """Only a directory at least two levels deep is a usable policy prefix. Broader prefixes stop the run."""
+
+    def test_directory_prefixes_are_usable(self) -> None:
+        from factory.policy_gate import usable_prefix
+
+        for good in ("web/src/", "backend/tests/", "docs/factory/proposals/"):
+            with self.subTest(prefix=good):
+                self.assertTrue(usable_prefix(good))
+
+    def test_broad_or_malformed_prefixes_are_refused(self) -> None:
+        from factory.policy_gate import usable_prefix
+
+        for bad in ("w", "web", "web/", ".", "./web/src/", "/web/src/", "web/../x/", "web/*/", "", "**", None, 3):
+            with self.subTest(prefix=bad):
+                self.assertFalse(usable_prefix(bad))
+
+    def test_an_approvals_file_entry_with_a_malformed_digest_is_skipped(self) -> None:
+        import tempfile as _t
+        repo_dir = _t.TemporaryDirectory()
+        try:
+            repo = Path(repo_dir.name)
+            git(repo, "init", "-q")
+            text = approvals([{"path": APPROVALS, "diff_sha256": "not-a-digest", "status": "approved",
+                               "approved_by": "owner-name"}])
+            base = write_commit(repo, {APPROVALS: text}, "base")
+            self.assertEqual(approved_file_digests(repo, base), {})
+        finally:
+            repo_dir.cleanup()

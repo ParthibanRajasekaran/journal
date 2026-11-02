@@ -65,7 +65,8 @@ class ApprovalTrust(Fixture):
         self.assertFalse((self.repo / ".factory-local" / "workspaces").exists() and any((self.repo / ".factory-local" / "workspaces").iterdir()))
 
     def test_approved_exception_admits_the_ticket_and_the_run_completes(self):
-        self.commit_approvals(approvals([{"prefix": "web/", "status": "approved", "approved_by": "owner"}]))
+        # The approved scope is a directory, web/src/. A broad prefix such as web/ is refused by usable_prefix().
+        self.commit_approvals(approvals([{"prefix": "web/src/", "status": "approved", "approved_by": "owner"}]))
         ticket = make_ticket(allowed_paths=["web/src/**"], verification=["no-broken-marker"])
         adapter = ScriptedAdapter([{"files": {"web/src/a.ts": "export const a = 1;\n"}}], [APPROVE])
         controller = Controller(self.repo, self.ledger, adapter, _config(), PROJECT, "hash-1")

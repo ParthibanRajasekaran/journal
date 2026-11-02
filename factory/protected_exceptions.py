@@ -72,11 +72,12 @@ def approved_file_digests(repo: Path, base: str, ticket_id: str | None = None) -
             continue
         if not (isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip()):
             continue
+        # The approvals file itself is never exempted, so its entries are skipped before any other check.
+        if path == APPROVALS_PATH:
+            continue
         # An approved entry with a malformed digest is an error, not a silent no-op.
         if not (isinstance(path, str) and isinstance(digest, str) and _DIGEST.fullmatch(digest)):
             raise FactoryError(f"approved entry for {path!r} has a malformed diff_sha256 at {base[:12]}")
-        if path == APPROVALS_PATH:
-            continue
         # An entry may name one ticket. Such an entry never applies to another ticket.
         if "ticket_id" in entry and entry["ticket_id"] != ticket_id:
             continue

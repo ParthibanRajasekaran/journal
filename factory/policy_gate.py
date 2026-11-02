@@ -65,6 +65,16 @@ def load_policy_at(repo: Path, ref: str) -> PolicyLists:
     return parse_policy(text)
 
 
+def usable_prefix(prefix: object) -> bool:
+    """A policy prefix must name a directory at least two levels deep, such as "web/src/". Anything broader is refused."""
+    if not isinstance(prefix, str):
+        return False
+    p = prefix.strip()
+    if not p.endswith("/") or p.startswith(("/", "./", "../")) or "*" in p or ".." in p:
+        return False
+    return p.count("/") >= 2 and all(part not in ("", ".") for part in p[:-1].split("/"))
+
+
 def approved_prefixes(repo: Path, ref: str) -> tuple[str, ...]:
     """Prefixes approved by the owner at this commit. Anything not status 'approved' with a named approver is ignored."""
     text = read_at(repo, ref, APPROVALS_PATH)
@@ -84,7 +94,7 @@ def approved_prefixes(repo: Path, ref: str) -> tuple[str, ...]:
         if entry.get("status") == "approved" and isinstance(entry.get("approved_by"), str) and entry["approved_by"].strip():
             prefix = entry.get("prefix")
             # An empty or non-string prefix would authorise every path. Refuse the whole file instead.
-            if not isinstance(prefix, str) or not prefix.strip() or prefix.strip() in ("/", "*", "**"):
+            if not usable_prefix(prefix):
                 raise FactoryError(f"an approved exception in {APPROVALS_PATH} has no usable prefix at {ref[:12]}")
             prefixes.append(prefix)
     return tuple(prefixes)
