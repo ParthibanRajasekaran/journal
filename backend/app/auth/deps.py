@@ -56,7 +56,8 @@ def _bearer_token(request: Request) -> str | None:
 async def current_user_id(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> str:
-    # The browser cookie is tried first, then a native bearer token. Either must name an existing account.
+    # The browser cookie is tried first, then a native bearer token.
+    # Either must name an account that still exists.
     token = request.cookies.get(ACCESS_COOKIE) or _bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required.")
