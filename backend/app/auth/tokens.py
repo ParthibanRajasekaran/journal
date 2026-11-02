@@ -62,6 +62,27 @@ def issue_access_token(user_id: str, key: str, ttl_seconds: int) -> str:
     )
 
 
+def access_subject_if_signed(token: str, key: str) -> str | None:
+    """The subject of an access token with a valid signature and issuer, expired or not.
+
+    Used only to decide whether a logout comes from a genuine session.
+    It never authenticates a request.
+    """
+    try:
+        claims: dict[str, Any] = jwt.decode(
+            token,
+            key,
+            algorithms=[ALGORITHM],
+            issuer=ISSUER,
+            options={"require": ["iat", "iss"], "verify_exp": False},
+        )
+    except jwt.PyJWTError:
+        return None
+    if claims.get("typ") != ACCESS_TYPE or not isinstance(claims.get("sub"), str):
+        return None
+    return str(claims["sub"])
+
+
 def user_id_from_access_token(token: str, key: str) -> str:
     claims = _decode(token, key)
     if claims.get("typ") != ACCESS_TYPE or not isinstance(claims.get("sub"), str):

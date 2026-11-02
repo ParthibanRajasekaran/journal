@@ -17,11 +17,11 @@ from app.auth.deps import (
     STATE_PATH,
     SessionDep,
     auth_key,
-    current_user_id,
     require_csrf,
 )
 from app.auth.tokens import (
     AuthError,
+    access_subject_if_signed,
     issue_access_token,
     issue_state_token,
     pkce_challenge,
@@ -213,8 +213,19 @@ async def logout(
     session: SessionDep,
 ) -> None:
     require_csrf(request)
-    current_user_id(request)
+    # Logout ends the browser's session even when the account is deleted, or the access
+    # token has expired. It is accepted only for a genuine session: an access token this server
+    # signed (expired or not), or a refresh token it issued. Anything else gets 401, and nothing is
+    # cleared.
     raw = request.cookies.get(REFRESH_COOKIE)
+    access = request.cookies.get(ACCESS_COOKIE)
+    # The signing key is read only when an access cookie is present. An anonymous logout is a 401.
+    signed = False
+    if access is not None:
+        signed = access_subject_if_signed(access, auth_key(request.app.state.settings)) is not None
+    recognised = raw is not None and await service.recognises(session, raw)
+    if not signed and not recognised:
+        raise HTTPException(status_code=401, detail="Sign in required.")
     if raw is not None:
         await service.revoke(session, raw)
     _clear_session_cookies(response)

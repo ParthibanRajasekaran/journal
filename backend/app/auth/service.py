@@ -65,6 +65,17 @@ async def rotate(session: AsyncSession, raw: str, *, ttl_days: int) -> tuple[str
     return row.user_id, new_raw
 
 
+async def recognises(session: AsyncSession, raw: str) -> bool:
+    """True when this server issued the refresh token, revoked or not.
+
+    Decides whether a logout is genuine.
+    """
+    result = await session.execute(
+        select(RefreshToken.id).where(RefreshToken.token_hash == hash_opaque_token(raw))
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def revoke(session: AsyncSession, raw: str) -> None:
     """Log out: revoke the family of this refresh token. Unknown tokens are ignored."""
     result = await session.execute(
