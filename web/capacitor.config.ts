@@ -8,7 +8,9 @@ const config: CapacitorConfig = {
   webDir: "dist",
   server: {
     androidScheme: "https",
-    cleartext: false,
+    // Off in every release build. A local test backend on the emulator's loopback needs plain HTTP, so cleartext is
+    // allowed only for a build made with JOURNAL_ANDROID_TEST_CLEARTEXT=1. That build is never a release.
+    cleartext: (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.JOURNAL_ANDROID_TEST_CLEARTEXT === "1",
   },
   plugins: {
     // The WebView cannot call the API across origins (no CORS grant, and cookies are not sent cross-site).
