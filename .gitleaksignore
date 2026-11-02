@@ -24,3 +24,7 @@ fb4a28768d30828129efae88e5b9426ca2f2de60:backend/tests/conftest.py:generic-api-k
 # line 11) in the outbox candidate commit 4fefa3c. It is not a credential, and no storage key is renamed. One entry
 # only, for the one commit that introduces the line. Owner review required before merge.
 4fefa3c4998a7cb54f81dcc29018a44b866a0939:web/src/offline.ts:generic-api-key:11
+
+# Historical only, same reviewed finding as 00a00a1 above: the plainly fake attempt value in the native sign-in test fixture.
+# Carried into this integration branch by the cherry-pick 96f499c of 00a00a1. The value was renamed in the same branch (2b9c000).
+96f499cac6bae56e989b1216ac6609e40b9e4ef7:web/src/native/auth.test.ts:generic-api-key:10
