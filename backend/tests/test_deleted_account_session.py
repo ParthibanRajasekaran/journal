@@ -176,3 +176,34 @@ def test_logout_still_needs_the_csrf_header(
 def test_logout_with_no_session_cookie_is_still_refused(client: TestClient) -> None:
     client.cookies.clear()
     assert client.post("/api/v1/auth/logout", headers=CSRF).status_code == 401
+
+
+def test_a_tampered_access_cookie_alone_is_refused_and_clears_nothing(client: TestClient) -> None:
+    from app.auth.tokens import issue_access_token
+
+    forged = issue_access_token(
+        "usr_not_real", "some-other-key-that-is-long-enough-to-pass-the-check", 600
+    )
+    client.cookies.clear()
+    client.cookies.set(ACCESS_COOKIE, forged)
+    response = client.post("/api/v1/auth/logout", headers=CSRF)
+
+    assert response.status_code == 401, response.text
+    assert "set-cookie" not in response.headers
+
+
+def test_an_unknown_refresh_cookie_alone_is_refused_and_clears_nothing(client: TestClient) -> None:
+    client.cookies.clear()
+    client.cookies.set("journal_refresh", "never-issued-by-this-server")
+    response = client.post("/api/v1/auth/logout", headers=CSRF)
+
+    assert response.status_code == 401, response.text
+    assert "set-cookie" not in response.headers
+
+
+def test_anonymous_logout_is_401_even_without_a_signing_key(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.cookies.clear()
+    monkeypatch.setattr(app.state.settings, "jwt_secret", None)
+    assert client.post("/api/v1/auth/logout", headers=CSRF).status_code == 401

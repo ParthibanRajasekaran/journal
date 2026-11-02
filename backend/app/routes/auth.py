@@ -219,8 +219,10 @@ async def logout(
     # cleared.
     raw = request.cookies.get(REFRESH_COOKIE)
     access = request.cookies.get(ACCESS_COOKIE)
-    key = auth_key(request.app.state.settings)
-    signed = access is not None and access_subject_if_signed(access, key) is not None
+    # The signing key is read only when an access cookie is present. An anonymous logout is a 401.
+    signed = False
+    if access is not None:
+        signed = access_subject_if_signed(access, auth_key(request.app.state.settings)) is not None
     recognised = raw is not None and await service.recognises(session, raw)
     if not signed and not recognised:
         raise HTTPException(status_code=401, detail="Sign in required.")
