@@ -122,3 +122,57 @@ def test_a_deleted_account_cannot_persist_or_replay_into_a_newly_registered_acco
     own = _post(client, stale, old_account)
     assert own.status_code == 401, own.text
     assert run(lambda engine: _rows_for(engine, stale["client_id"])) == 0
+
+
+def test_logout_clears_cookies_for_a_deleted_account_and_revokes_nothing_it_cannot_reach(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in(client, monkeypatch, "sub-logout-deleted")
+    access = client.cookies.get(ACCESS_COOKIE)
+    refresh = client.cookies.get("journal_refresh")
+    assert access is not None
+    assert refresh is not None
+    assert client.delete("/api/v1/me", headers=CSRF).status_code == 204
+
+    client.cookies.set(ACCESS_COOKIE, access)
+    client.cookies.set("journal_refresh", refresh)
+    response = client.post("/api/v1/auth/logout", headers=CSRF)
+
+    assert response.status_code == 204, response.text
+    cleared = " ".join(response.headers.get_list("set-cookie"))
+    assert f"{ACCESS_COOKIE}=" in cleared
+    assert "Max-Age=0" in cleared
+
+
+def test_logout_with_an_expired_access_token_revokes_the_family_and_clears_cookies(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, settings: Settings
+) -> None:
+    from app.auth.tokens import issue_access_token, signing_key
+
+    account = _sign_in(client, monkeypatch, "sub-expired")
+    refresh = client.cookies.get("journal_refresh")
+    assert refresh is not None
+    expired = issue_access_token(account, signing_key(settings.jwt_secret), ttl_seconds=-60)
+
+    client.cookies.set(ACCESS_COOKIE, expired)
+    client.cookies.set("journal_refresh", refresh)
+    response = client.post("/api/v1/auth/logout", headers=CSRF)
+
+    assert response.status_code == 204, response.text
+    assert "Max-Age=0" in " ".join(response.headers.get_list("set-cookie"))
+    # The refresh token from before logout must now be refused: its family was revoked.
+    client.cookies.set("journal_refresh", refresh)
+    client.cookies.delete(ACCESS_COOKIE)
+    assert client.post("/api/v1/auth/refresh", headers=CSRF).status_code == 401
+
+
+def test_logout_still_needs_the_csrf_header(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sign_in(client, monkeypatch, "sub-csrf")
+    assert client.post("/api/v1/auth/logout").status_code == 403
+
+
+def test_logout_with_no_session_cookie_is_still_refused(client: TestClient) -> None:
+    client.cookies.clear()
+    assert client.post("/api/v1/auth/logout", headers=CSRF).status_code == 401
