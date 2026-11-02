@@ -56,32 +56,22 @@ def _bearer_token(request: Request) -> str | None:
 async def current_user_id(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> str:
-    # The browser cookie is tried first, then a native bearer token.
-    # Either must name an account that still exists.
-    token = request.cookies.get(ACCESS_COOKIE) or _bearer_token(request)
-    if not token:
+    # The browser cookie and a native bearer token are tried in turn.
+    # A stale or invalid cookie must not block a valid bearer token, so a failing candidate
+    # falls through to the next. The account must still exist.
+    key = auth_key(request.app.state.settings)
+    user_id: str | None = None
+    for token in (request.cookies.get(ACCESS_COOKIE), _bearer_token(request)):
+        if not token:
+            continue
+        try:
+            user_id = user_id_from_access_token(token, key)
+            break
+        except AuthError:
+            continue
+    if user_id is None:
         raise HTTPException(status_code=401, detail="Sign in required.")
-    try:
-        user_id = user_id_from_access_token(token, auth_key(request.app.state.settings))
-    except AuthError as exc:
-        raise HTTPException(status_code=401, detail="Sign in required.") from exc
     # Deleted means deleted_at is set, as in the account routes. Soft-deleted accounts are refused.
-    exists = (
-        await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
-    ).scalar_one_or_none()
-    if exists is None:
-        raise HTTPException(status_code=401, detail="Sign in required.")
-    return user_id
-    if not token:
-        raise HTTPException(status_code=401, detail="Sign in required.")
-    try:
-        user_id = user_id_from_access_token(token, auth_key(request.app.state.settings))
-    except AuthError as exc:
-        raise HTTPException(status_code=401, detail="Sign in required.") from exc
-    # A valid token is not enough: its account must still exist. A deleted account's copied
-    # token is refused here, before any read or write, so it never reaches a foreign-key failure.
-    # Deleted means deleted_at is set, as in the account routes.
-    # A soft-deleted account is refused too.
     exists = (
         await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
     ).scalar_one_or_none()

@@ -196,3 +196,18 @@ def test_journey_deleted_account_is_refused_and_a_new_registration_starts_empty(
     # The same sign-in subject registers again as a new account with no meals.
     again = sign_in(client, "synthetic-sub-deleted")
     assert saved_ids(client, again) == []
+
+
+def test_a_stale_browser_cookie_does_not_block_a_valid_native_bearer_token(
+    client: TestClient,
+) -> None:
+    # The Android WebView can keep a cookie from an earlier browser sign-in.
+    # A bad cookie must not lock the app out.
+    tokens = sign_in(client, "synthetic-sub-stale-cookie")
+    client.cookies.set("journal_access", "not-a-token-this-server-issued")
+    assert client.get("/api/v1/me", headers=bearer(tokens)).status_code == 200
+    body = meal_body(name="Stale cookie still saves")
+    created = client.post(
+        "/api/v1/meals", json=body, headers=write_headers(tokens, body["client_id"])
+    )
+    assert created.status_code == 201, created.text
