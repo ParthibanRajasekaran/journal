@@ -56,7 +56,7 @@ def _bearer_token(request: Request) -> str | None:
 async def current_user_id(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> str:
-    # The browser cookie is tried first, then a native bearer token. Both must name an account that still exists.
+    # The browser cookie is tried first, then a native bearer token. Either must name an existing account.
     token = request.cookies.get(ACCESS_COOKIE) or _bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required.")
@@ -64,7 +64,7 @@ async def current_user_id(
         user_id = user_id_from_access_token(token, auth_key(request.app.state.settings))
     except AuthError as exc:
         raise HTTPException(status_code=401, detail="Sign in required.") from exc
-    # Deleted means deleted_at is set, as in the account routes. Soft-deleted accounts are refused too.
+    # Deleted means deleted_at is set, as in the account routes. Soft-deleted accounts are refused.
     exists = (
         await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
     ).scalar_one_or_none()
