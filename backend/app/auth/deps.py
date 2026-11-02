@@ -53,31 +53,31 @@ def _bearer_token(request: Request) -> str | None:
     return value.strip()
 
 
+async def _account_is_live(session: AsyncSession, user_id: str) -> bool:
+    """True when the account exists and is not deleted. Deleted means deleted_at is set."""
+    found = (
+        await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    return found is not None
+
+
 async def current_user_id(
     request: Request, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> str:
-    # The browser cookie and a native bearer token are tried in turn.
-    # A stale or invalid cookie must not block a valid bearer token, so a failing candidate
-    # falls through to the next. The account must still exist.
-    key = auth_key(request.app.state.settings)
-    user_id: str | None = None
+    # The browser cookie and a native bearer token are tried in turn. A candidate is used only when
+    # its token verifies and its account is live. A stale, invalid or deleted-account cookie never
+    # blocks a valid bearer token. A missing or unusable token reads no signing key.
     for token in (request.cookies.get(ACCESS_COOKIE), _bearer_token(request)):
         if not token:
             continue
+        key = auth_key(request.app.state.settings)
         try:
             user_id = user_id_from_access_token(token, key)
-            break
         except AuthError:
             continue
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Sign in required.")
-    # Deleted means deleted_at is set, as in the account routes. Soft-deleted accounts are refused.
-    exists = (
-        await session.execute(select(User.id).where(User.id == user_id, User.deleted_at.is_(None)))
-    ).scalar_one_or_none()
-    if exists is None:
-        raise HTTPException(status_code=401, detail="Sign in required.")
-    return user_id
+        if await _account_is_live(session, user_id):
+            return user_id
+    raise HTTPException(status_code=401, detail="Sign in required.")
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]

@@ -211,3 +211,19 @@ def test_a_stale_browser_cookie_does_not_block_a_valid_native_bearer_token(
         "/api/v1/meals", json=body, headers=write_headers(tokens, body["client_id"])
     )
     assert created.status_code == 201, created.text
+
+
+def test_a_signed_cookie_of_a_deleted_account_does_not_block_a_live_bearer_token(
+    client: TestClient,
+) -> None:
+    from app.auth.tokens import issue_access_token, signing_key
+
+    gone = sign_in(client, "synthetic-sub-gone-cookie")
+    gone_id = client.get("/api/v1/me", headers=bearer(gone)).json()["id"]
+    assert client.delete("/api/v1/me", headers={**bearer(gone), **CSRF}).status_code == 204
+    live = sign_in(client, "synthetic-sub-live-bearer")
+    key = signing_key(client.app.state.settings.jwt_secret)  # type: ignore[attr-defined]
+    # A validly signed cookie for the deleted account: it verifies, but its account is gone.
+    client.cookies.set("journal_access", issue_access_token(gone_id, key, 900))
+    assert client.get("/api/v1/me", headers=bearer(live)).status_code == 200
+    assert client.get("/api/v1/me").status_code == 401
