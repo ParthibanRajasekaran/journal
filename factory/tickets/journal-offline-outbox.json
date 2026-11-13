@@ -3,18 +3,22 @@
   "title": "Account-safe offline meal capture",
   "outcome": "A meal saved offline is kept for the account that saved it, is sent only while that account is signed in, is never reported saved when storage refuses it, and is removed when its account is deleted.",
   "risk_class": "high",
-  "base_commit": "b5f296f8c9ca4bb209a9ad38ed72d17500ab9eb2",
+  "base_commit": "84959bf94b5e752f1ed83e5400e29fcf0c12d037",
   "allowed_paths": [
+    ".gitleaksignore",
+    "backend/app/routes/meals.py",
+    "backend/tests/test_expected_account.py",
+    "docs/openapi.yaml",
     "web/src/App.tsx",
-    "web/src/api.ts",
     "web/src/api.test.ts",
-    "web/src/offline.ts",
+    "web/src/api.ts",
     "web/src/offline.test.ts",
-    "web/src/session.ts",
-    "web/src/vite-env.d.ts",
+    "web/src/offline.ts",
     "web/src/screens/AddMeal.tsx",
+    "web/src/screens/Settings.tsx",
     "web/src/screens/Today.tsx",
-    "web/src/screens/Settings.tsx"
+    "web/src/session.ts",
+    "web/src/vite-env.d.ts"
   ],
   "protected_paths": [],
   "acceptance": [

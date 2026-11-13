@@ -29,7 +29,7 @@ Last updated: 2026-10-31. This file is the checkpoint for planning work. Update 
 2. **Estimate schema.** ADR-001 uses `calories` and numeric `confidence`. ADR-005 uses `calories_kcal` and `low|medium|high`. Neither has `is_food`. Pick one set and update both ADRs.
 3. **EU transfer basis and Article 9 status.** Counsel to confirm the transfer mechanism for US AI providers and whether meal and photo data is special-category health data.
 4. **Refresh-token lifetime (90 days) and re-auth window (5 min).** Proposed in ADR-004. The code currently uses 30 days (`refresh_token_ttl_days`). Confirm which value to keep.
-5. **Hosting target.** Decided: Oracle Always Free (ADR-007). Account created with home region UK South (London), accepted by owner; counsel must confirm it for EU users. Instance not yet created.
+5. **Hosting target.** Decided: Oracle Always Free (ADR-007). Account created with home region UK South (London), accepted by owner; counsel must confirm it for EU users. Instance created and running; observed read-only on 2026-11-01 (see `docs/deployment-evidence.md`).
 6. **Client approach.** Capacitor hybrid (ADR-003) versus native. See `docs/client-architecture.md`.
 
 ## Verification still needed
