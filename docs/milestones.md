@@ -18,7 +18,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
   `JOURNAL_SOURCE_SHA` (build arg in `docker/Dockerfile.api`). Add to `docs/openapi.yaml`. Test `@pytest.mark.m0`.
 - [x] 2. Migrations in deployment: compose one-shot `migrate` service (`alembic upgrade head`) that `api` depends on.
   `make migrate` exists already; test that the compose file parses with `docker compose config`.
-- [ ] 3. Release-configuration guards: `web/vite.config.ts` fails `--mode beta|production` when `VITE_API_BASE` is not
+- [x] 3. Release-configuration guards: `web/vite.config.ts` fails `--mode beta|production` when `VITE_API_BASE` is not
   `https://`; `web/scripts/build-android.sh <beta|emulator>` sets `VITE_API_BASE` and `VITE_BUILD_SHA`, refuses
   `JOURNAL_ANDROID_TEST_CLEARTEXT` outside `emulator`, runs `vite build`, `cap sync android`, `gradlew assembleDebug`,
   prints APK SHA-256 and source SHA. Backend: production refuses `cookie_secure=false` and a missing `jwt_secret` at
@@ -53,6 +53,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 |---|---|---|---|---|
 | 2026-11-15 | (this commit) | M0 task 1: `GET /api/v1/version` | mocked test | `backend/tests/test_version.py` (m0) and `make gate` pass; `/version` added to the public-route allowlist |
 | 2026-11-15 | (this commit) | M0 task 2: compose `migrate` one-shot, `api` depends on `service_completed_successfully` | mocked test | `backend/tests/test_compose.py` (m0) runs `docker compose config`; containers not started |
+| 2026-11-15 | 9435ad4 (tree dirty) | M0 task 3: production Settings guards; `vite build --mode beta\|production` HTTPS guard; `web/scripts/build-android.sh` | mocked test + local build | `backend/tests/test_production_settings.py` (m0). `VITE_API_BASE=http://x` and unset fail, `https://x` builds. `build-android.sh beta` with JDK 21 built an unsigned debug APK, SHA-256 `b8a9e76b...2d7a`; not installed on any device |
 
 ### Parked
 

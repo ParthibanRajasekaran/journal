@@ -5,9 +5,9 @@ server's owner-only .env file (ADR-002, ADR-004), never from the repository.
 """
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     # Abuse limits (per signed-in user). A burst of this many writes is allowed, then it refills.
     write_requests_per_minute: int = 30
     meals_per_day: int = 300
+
+    @model_validator(mode="after")
+    def _production_is_safe(self) -> Self:
+        """A production process must not start with insecure cookies or without a signing secret."""
+        if self.environment == "production":
+            if not self.cookie_secure:
+                raise ValueError("JOURNAL_COOKIE_SECURE must be true in production")
+            if self.jwt_secret is None or not self.jwt_secret.get_secret_value():
+                raise ValueError("JOURNAL_JWT_SECRET is required in production")
+        return self
 
 
 @lru_cache
