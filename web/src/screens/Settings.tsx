@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useId, useState } from "react";
-import { api, AiKeyStatus, Profile, Provider } from "../api";
+import { api, AiKeyStatus, Profile, Provider, ServerVersion } from "../api";
 import { PROVIDERS as KEY_PAGES } from "./KeyHelp";
 import { discardAccountDurably } from "../offline";
 
@@ -34,9 +34,47 @@ export function Settings({ profile, onProfile, onSignedOut }: Props) {
         </div>
         <div>
           <AiKeys />
+          <BuildInfoCard />
         </div>
       </div>
     </>
+  );
+}
+
+function BuildInfoCard() {
+  const [server, setServer] = useState<ServerVersion | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api
+      .version()
+      .then((version) => live && setServer(version))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return <BuildInfo appSha={import.meta.env.VITE_BUILD_SHA} server={server} failed={failed} />;
+}
+
+// Presentational, so the labels can be tested without a network.
+export function BuildInfo({ appSha, server, failed }: { appSha?: string; server: ServerVersion | null; failed: boolean }) {
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>About this build</h2>
+      <dl className="muted" style={{ margin: 0 }}>
+        <dt>App build</dt>
+        <dd>{appSha ? appSha.slice(0, 12) : "development build"}</dd>
+        <dt>Server</dt>
+        <dd>
+          {server
+            ? `${server.source_sha.slice(0, 12)} (${server.environment}, API ${server.api_version}, migration ${server.migration_head ?? "none"})`
+            : failed
+              ? "Can't reach the server."
+              : "Checking…"}
+        </dd>
+      </dl>
+    </section>
   );
 }
 

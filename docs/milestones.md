@@ -23,7 +23,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
   `JOURNAL_ANDROID_TEST_CLEARTEXT` outside `emulator`, runs `vite build`, `cap sync android`, `gradlew assembleDebug`,
   prints APK SHA-256 and source SHA. Backend: production refuses `cookie_secure=false` and a missing `jwt_secret` at
   startup (Settings validation, test).
-- [ ] 4. Settings screen shows the app build SHA (`VITE_BUILD_SHA`) and the server `/version` output.
+- [x] 4. Settings screen shows the app build SHA (`VITE_BUILD_SHA`) and the server `/version` output.
 - [ ] 5. Beta stack proposal, not activated: `docker/beta/compose.yaml` (project `journal-beta`: `api`, `migrate`,
   `postgres`, own volume, `env_file: .env.beta` never committed) and a Caddy site block for
   `beta.journal.getrendercheck.com` proxying to the beta API on a shared external network. `docs/release/beta-backend.md`:
@@ -54,6 +54,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | 2026-11-15 | (this commit) | M0 task 1: `GET /api/v1/version` | mocked test | `backend/tests/test_version.py` (m0) and `make gate` pass; `/version` added to the public-route allowlist |
 | 2026-11-15 | (this commit) | M0 task 2: compose `migrate` one-shot, `api` depends on `service_completed_successfully` | mocked test | `backend/tests/test_compose.py` (m0) runs `docker compose config`; containers not started |
 | 2026-11-15 | 9435ad4 (tree dirty) | M0 task 3: production Settings guards; `vite build --mode beta\|production` HTTPS guard; `web/scripts/build-android.sh` | mocked test + local build | `backend/tests/test_production_settings.py` (m0). `VITE_API_BASE=http://x` and unset fail, `https://x` builds. `build-android.sh beta` with JDK 21 built an unsigned debug APK, SHA-256 `b8a9e76b...2d7a`; not installed on any device |
+| 2026-11-15 | f3f0970 (tree dirty) | M0 task 4: Settings "About this build" (app `VITE_BUILD_SHA`, server `/version`) | mocked test | `web/src/screens/Settings.build-info.test.ts` and `make gate` pass; not seen on a device |
 
 ### Parked
 

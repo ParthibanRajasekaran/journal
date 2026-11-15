@@ -116,7 +116,14 @@ export interface NativeTokens {
   expires_in: number;
 }
 
-export const CSRF_HEADER = { "X-Journal-Request": "1" } as const;
+export interface ServerVersion {
+  api_version: string;
+  source_sha: string;
+  migration_head: string | null;
+  environment: string;
+}
+
+export const CSRF_HEADER ={ "X-Journal-Request": "1" } as const;
 // Empty for the web build, which is served by the API. Native builds set VITE_API_BASE to the
 // HTTPS origin of the backend, for example https://journal.example.
 const BASE = `${import.meta.env.VITE_API_BASE ?? ""}/api/v1`;
@@ -194,6 +201,8 @@ export const api = {
   signInUrl: `${BASE}/auth/google/start`,
   // Read-only reachability check. It sends no credentials and changes nothing on the server.
   health: () => request<{ status: string }>("GET", "/health"),
+  // Which source commit and migration the server is running. Public, changes nothing.
+  version: () => request<ServerVersion>("GET", "/version"),
   me: () => request<Profile>("GET", "/me"),
   // A target set to null is cleared.
   updateMe: (patch: {
