@@ -2,6 +2,8 @@
 
 Status: Proposed · Date: 2026-10-29 · Relates to: PRD FR-4, FR-5, FR-7, FR-10, Section 7
 
+Note, 2026-11-15: the implemented boundary is thin and text-only. `backend/app/ai/estimate.py` calls the OpenAI chat-completions, Anthropic messages and Gemini generateContent endpoints with the user's own stored key and returns a draft for the user to confirm; nothing is saved by the estimate. Image input does not exist (milestone M2). Stored keys use AES-256-GCM with one static server key (`JOURNAL_KEY_ENCRYPTION_KEY`), bound to owner and provider; envelope encryption with key versions is not implemented. There is no stored provider preference yet: a request that names a provider uses only that provider's key, but a request that names none uses the first saved key in a fixed provider order, which conflicts with "no silent fallback" and is replaced by an explicit preference in milestone M1. The developer funds no AI calls, and automatic paid evaluation runs are not allowed.
+
 ## Context
 
 The PRD requires meal estimates from a photo or text, from one of three providers: Google Gemini (free tier, default), OpenAI, or Anthropic. Users choose the provider, may bring their own key (stored encrypted), and can switch at any time. Core logic must not depend on a vendor SDK. Every provider returns one validated schema, and failures reach the user.

@@ -2,6 +2,8 @@
 
 **Status:** Proposed (2026-10-29). Resolves PRD open question 2.
 
+Note, 2026-11-15: deployment is manual. The owner builds and starts the Compose stack on the server (`docker/compose.yaml`, with a one-shot `migrate` service that the api waits for); no deploy job exists, and the running SHA is read from `GET /api/v1/version`, not inferred from a branch. Nightly encrypted backups run from `ops/backup.sh`. No restore has been recorded yet: the first restore evidence belongs in `docs/release/beta-backend.md` (milestone M5). The paid-VPS cost estimate is superseded by ADR-007.
+
 ## Context
 
 The backend is FastAPI with PostgreSQL in a container. The web client is a static build. Mobile apps are built separately and distributed through app stores. Constraints: no hard dependency on one cloud vendor, containerized backend, open-source core, small team, and low cost at low traffic.

@@ -2,6 +2,8 @@
 
 **Status:** Proposed, 2026-10-29. Owner: Security. Related: PRD FR-1, FR-2, FR-3, FR-9.
 
+Note, 2026-11-15: the implemented flows are (a) the browser Google authorization-code flow with signed cookies, and (b) a native flow where the app obtains a Google ID token bound to a server nonce, completes a single-use attempt, and holds a rotating refresh token in platform secure storage (`docs/native-sign-in.md`). Biometric unlock is not implemented. Both flows are proven with locally signed test tokens only. Real-device sign-in with a real Google token is an explicit release gate (milestone M0 manual criterion); until it passes, which `aud` and `azp` Google issues on Android and iOS is unproven (`docs/release/google-oauth.md`).
+
 ## Context
 
 Google sign-in is the only MVP sign-in method, and the first sign-in creates the account. Users may then enable biometric unlock. It must not replace Google sign-in on a new device, must not use a PIN, and must not leave a long-lived secret in plain storage.

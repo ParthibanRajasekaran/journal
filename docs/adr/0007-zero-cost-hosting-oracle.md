@@ -2,6 +2,8 @@
 
 Status: Accepted by owner (2026-10-29). Supersedes the hosting decision in ADR-002. ADR-002's Docker Compose stack, Caddy, and backup approach still apply.
 
+Note, 2026-11-15: the Oracle setup is manual and is documented in `docs/deployment-evidence.md`; this ADR does not prove the current deployment. "Zero cost" is an owner constraint, not a guarantee. A restore test has not been recorded, so a backup is not yet shown to be restorable; `docs/release/beta-backend.md` holds the procedure and, once run, the evidence. A second, isolated beta stack on the same VM is proposed there and is not activated.
+
 ## Context
 
 The owner requires the whole build to cost nothing. ADR-002 chose a paid VPS (about EUR 6–10 a month). Managed free tiers fail on data persistence (Render's free disk is wiped on restart, Supabase pauses after a week of inactivity), and AWS, Azure, and Google Cloud bill per request, so a flood of attack traffic can create a large bill. Their budget alerts send email but do not stop spending.

@@ -32,7 +32,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 - [x] 6. `docs/release/google-oauth.md`: owner checklist for the Android client (package `com.journal.nutrition`, debug
   keystore SHA-1), the web client id (token audience) and the iOS client id; declare `VITE_GOOGLE_WEB_CLIENT_ID` and
   `VITE_GOOGLE_IOS_CLIENT_ID` in `web/src/vite-env.d.ts`.
-- [ ] 7. ADR reconciliation (status and notes blocks only) per `docs/spec/03` "ADR reconciliation": ADR-001 natural keys
+- [x] 7. ADR reconciliation (status and notes blocks only) per `docs/spec/03` "ADR reconciliation": ADR-001 natural keys
   and versions, no replay cache or batch sync yet; ADR-002/007 manual build-on-server deploy, backup restore evidence;
   ADR-003 done in Phase 0; ADR-004 actual native flow, real-device evidence as release gate; ADR-005 chat-completions
   text-only, static key encryption, explicit preference pending M1; ADR-006 done in Phase 0.
@@ -57,6 +57,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | 2026-11-15 | f3f0970 (tree dirty) | M0 task 4: Settings "About this build" (app `VITE_BUILD_SHA`, server `/version`) | mocked test | `web/src/screens/Settings.build-info.test.ts` and `make gate` pass; not seen on a device |
 | 2026-11-15 | 0429afb (tree dirty) | M0 task 5: beta stack proposal (`docker/beta/*`), `docs/release/beta-backend.md`, `ops/backup.sh` parameterised | mocked test | `backend/tests/test_beta_stack.py` (m0) checks isolation and `docker compose config` parsing. Not activated, no container started, restore never run, Caddy block not validated by Caddy |
 | 2026-11-15 | 43cc782 (tree dirty) | M0 task 6: `docs/release/google-oauth.md`; `VITE_GOOGLE_*` declared in `vite-env.d.ts` | mocked test | `make gate` passes. Documentation only; no OAuth client exists and no real token has been seen |
+| 2026-11-15 | d83ba56 (tree dirty) | M0 task 7: dated notes on ADR-001, 002, 004, 005, 007 (003 and 006 already done) | none (docs) | Notes checked against `meals.py`, `estimate.py`, `estimates.py`, `crypto.py`; statuses unchanged |
 
 ### Parked
 - `backend/app/auth/google.py` (outside M0 paths) verifies one audience (`JOURNAL_GOOGLE_CLIENT_ID`) and refuses any

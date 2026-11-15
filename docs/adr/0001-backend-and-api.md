@@ -4,6 +4,8 @@
 
 Proposed (2026-10-29). Related: ADR-002 (hosting), ADR-003 (mobile), ADR-005 (AI provider port), ADR-006 (guardrail policy, to be written).
 
+Note, 2026-11-15: what is implemented differs from the text below. Creates are idempotent by a natural key: `client_id` is unique per owner, `Idempotency-Key` must equal it, and a repeat returns the existing row (`backend/app/routes/meals.py`). Edits use an integer `version` checked through `If-Match`. There is no stored-response replay cache and no batch sync endpoint, and photo upload and storage do not exist yet (milestone M2). Treat those parts of this ADR as intent. Migrations are additive (milestone rule), and `GET /api/v1/version` reports the source SHA and migration head.
+
 ## Context
 
 The PRD (now `docs/spec/01-prd.md`) fixes FastAPI and PostgreSQL and requires: idempotent offline sync that never loses photos (FR-8); authentication and rate limiting on every non-public route; Google OIDC with PKCE and rotating refresh tokens; per-user data with no seeded records; a provider-agnostic AI port (ADR-005); server-side guardrails (ADR-006); and API p95 under 300 ms excluding AI calls.
