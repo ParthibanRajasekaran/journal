@@ -4,6 +4,8 @@
 
 Proposed, 2026-10-29. Supersedes the default in PRD section 11 only after acceptance.
 
+Note, 2026-11-15: the canonical client is `web/` (React 18 + Vite + Capacitor 8, native projects under `web/android` and `web/ios`). The root prototype described in the Context section (`src/`, `server.ts`, sql.js store, biometric service) was removed from the repository on the `mvp/daily-use` branch; it is kept in git history only. Biometric unlock and SQLite are not implemented in the canonical client.
+
 ## Context
 
 The PRD requires one UI codebase for web (responsive), Android, and iOS; an open-source cross-platform framework; biometric unlock (Face ID, Touch ID, Android BiometricPrompt) backed by Keychain/Secure Enclave or Android Keystore; offline logging with a sync queue (FR-8); small app size and cold start under 2 s on a mid-range phone.

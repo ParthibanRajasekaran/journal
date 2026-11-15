@@ -5,7 +5,7 @@ info:
   summary: Meal logging API for the Journal app (MVP).
   description: 'Draft contract for ADR-001. Field names for estimates follow ADR-001 and are
 
-    pending the schema decision in docs/progress.md (open decision 2).
+    pending the schema decision recorded in docs/spec/03-architecture-and-implementation.md.
 
     Every non-public operation requires a Bearer access token. Errors use
 

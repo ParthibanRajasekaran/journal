@@ -38,7 +38,15 @@ __pycache__/
 # Web app build output and packages
 web/node_modules/
 web/dist/
+web/android/app/build/
+web/android/.gradle/
+*.apk
 
 # Playwright output
 web/test-results/
 web/playwright-report/
+.claude/agent-override
+.claude/settings.local.json
+
+# Local factory run state from earlier experiments on this machine (never product files)
+.factory-local/

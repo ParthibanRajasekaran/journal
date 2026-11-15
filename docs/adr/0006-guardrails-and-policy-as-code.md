@@ -1,6 +1,8 @@
 # ADR-006: Guardrails and policy-as-code
 
-**Status:** Proposed, 2026-10-29. Owner: Security and LLM architecture. Relates to ADR-001 (API), ADR-004 (auth), ADR-005 (AI port). Implements PRD FR-3, FR-4, FR-5, FR-7, FR-10 and sections 6 and 7.
+**Status:** Superseded, 2026-11-15 (was Proposed, 2026-10-29). Authorization and validation live in Python and SQL: `backend/app/auth/deps.py` (session, CSRF, write limits), per-route owner checks filtered by `user_id`, and the estimate validator in `backend/app/ai/estimate.py`. No OPA runs at runtime or in CI; the `policy/` directory and the change-set checker were removed from the repository. The input and output guardrail intent below still applies and is implemented in code with tests.
+
+Original: Owner: Security and LLM architecture. Relates to ADR-001 (API), ADR-004 (auth), ADR-005 (AI port). Implements PRD FR-3, FR-4, FR-5, FR-7, FR-10 and sections 6 and 7.
 
 ## Context
 

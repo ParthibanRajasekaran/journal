@@ -1,6 +1,6 @@
 """Attempt-bound native sign-in: the database steps.
 
-See docs/factory/proposals/native-auth/DESIGN.md.
+See docs/native-sign-in.md.
 
 Only functions that touch the attempt table live here. Token verification is done by the route
 with the existing Google verifier, before any row is changed.

@@ -6,7 +6,7 @@ Proposed (2026-10-29). Related: ADR-002 (hosting), ADR-003 (mobile), ADR-005 (AI
 
 ## Context
 
-The PRD (`docs/prd.md`) fixes FastAPI and PostgreSQL and requires: idempotent offline sync that never loses photos (FR-8); authentication and rate limiting on every non-public route; Google OIDC with PKCE and rotating refresh tokens; per-user data with no seeded records; a provider-agnostic AI port (ADR-005); server-side guardrails (ADR-006); and API p95 under 300 ms excluding AI calls.
+The PRD (now `docs/spec/01-prd.md`) fixes FastAPI and PostgreSQL and requires: idempotent offline sync that never loses photos (FR-8); authentication and rate limiting on every non-public route; Google OIDC with PKCE and rotating refresh tokens; per-user data with no seeded records; a provider-agnostic AI port (ADR-005); server-side guardrails (ADR-006); and API p95 under 300 ms excluding AI calls.
 
 ## Decision
 

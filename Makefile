@@ -7,9 +7,9 @@ PG_PORT ?= 5433
 PG_USER ?= $(shell whoami)
 export JOURNAL_TEST_DATABASE_URL ?= postgresql+asyncpg://$(PG_USER)@$(PG_HOST):$(PG_PORT)/journal_test
 
-.PHONY: check preflight lint typecheck test policy secrets audit hooks db-setup web
+.PHONY: check preflight lint typecheck test secrets audit hooks db-setup migrate web gate gate-full web-e2e-local
 
-check: preflight lint typecheck test policy secrets audit web
+check: preflight lint typecheck test secrets audit web
 
 # Fail fast with a clear message rather than letting the database tests error out.
 preflight:
@@ -21,6 +21,10 @@ db-setup:
 	-createdb -h $(PG_HOST) -p $(PG_PORT) journal_dev 2>/dev/null
 	-createdb -h $(PG_HOST) -p $(PG_PORT) journal_test 2>/dev/null
 
+# Applies every migration to the development database (JOURNAL_DATABASE_URL, default journal_dev on 5433).
+migrate:
+	cd backend && uv run alembic upgrade head
+
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check .
 
@@ -29,10 +33,6 @@ typecheck:
 
 test:
 	cd backend && uv run pytest --cov=app --cov=tests --cov-report=term-missing --cov-fail-under=90
-
-policy:
-	opa check policy
-	opa test policy
 
 # Scans the full git history, not just the working tree, so an old committed key is caught too.
 secrets:
@@ -49,3 +49,14 @@ hooks:
 # Web screens: type-check, unit tests, and a production build.
 web:
 	cd web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
+
+# Agent gates. `gate` checks only the areas that changed; `gate-full` is `check` plus the web build.
+gate:
+	./scripts/gate.sh --fast
+
+gate-full:
+	./scripts/gate.sh --full
+
+# Browser journeys against a local backend only. Never point this at the live site casually.
+web-e2e-local:
+	cd web && E2E_BASE_URL=$${E2E_BASE_URL:-http://127.0.0.1:8000} npx playwright test

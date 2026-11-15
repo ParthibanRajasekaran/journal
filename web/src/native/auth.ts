@@ -1,5 +1,5 @@
 // Native sign-in orchestration. Dependencies are injected, so the rules can be tested without a device.
-// See docs/factory/proposals/native-auth/DESIGN.md for the contract this follows.
+// See docs/native-sign-in.md for the contract this follows.
 //
 // Stale operations: every sign-in and every sign-out advances a generation. A refresh or sign-in that started
 // earlier may finish later. When it does, it must not store tokens or touch the device's state. If it obtained

@@ -1,118 +1,51 @@
-# Journal - Nutrition Tracking App
+# Journal
 
-A cross-platform nutrition tracking application built with React, TypeScript, and Capacitor. Track meals, monitor micronutrients, and achieve your health goals with an intelligent coaching system.
+A personal nutrition and training journal: meals with approximate calories and protein, morning weight, actual workouts and
+recovery, with optional AI estimates paid for by the user's own provider key. Android and iOS via Capacitor, plus the web.
 
-## Features
+The product specification is in `docs/spec/` (frozen) and delivery status in `docs/milestones.md`.
 
-- 📱 Cross-platform (iOS, Android, Web)
-- 🍽️ Meal tracking with AI optimization
-- 📊 Nutrition analytics and micronutrient dashboard
-- 💪 Protein trend tracking
-- 🎯 Adaptive daily goals
-- 🔐 Biometric authentication
-- 📱 PWA with offline support
-- 🎉 Achievement badges and streak counter
+## Layout
 
-## Prerequisites
+| Path | What |
+|---|---|
+| `web/` | The only client: React 18, TypeScript, Vite, Capacitor 8. Native projects in `web/android` and `web/ios`; Google sign-in plugin in `web/plugins`. |
+| `backend/` | The only API: FastAPI, PostgreSQL, SQLAlchemy, Alembic. Settings are `JOURNAL_*` environment variables (`backend/.env.example`). |
+| `docker/` | Compose stack for a server: Caddy (HTTPS), the API image, PostgreSQL. |
+| `ops/` | Backup and disk-alert scripts run from the server crontab. |
+| `docs/` | `spec/` (product spec), `adr/` (decisions), `openapi.yaml` (contract, enforced by tests), `release/` (build and deploy runbooks), `evals/` (AI evaluation sets), `legal/`. |
+| `scripts/` | `gate.sh` (quality gates) and `agent/` (Claude Code guardrails). |
 
-- **Node.js** (v18+)
-- **npm** or **bun**
-- **Xcode** (for iOS builds)
-- **Android Studio** (for Android builds)
+## Local setup
 
-## Setup
+Requirements: Node 20+, Python 3.12+ with [uv](https://docs.astral.sh/uv/), PostgreSQL on `127.0.0.1:5433`, gitleaks.
 
-1. Install dependencies:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
-
-2. Configure environment variables:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-## Development
-
-Run the web app locally:
 ```bash
-npm run dev
+make db-setup                      # creates journal_dev and journal_test
+make migrate                       # alembic upgrade head on journal_dev
+cp backend/.env.example backend/.env   # fill in the Google client, JWT secret and key-encryption key
+cd backend && uv sync && uv run uvicorn app.main:create_app --factory --reload --port 8000
+cd web && npm ci && npm run dev    # http://localhost:5173, proxies /api to :8000
 ```
 
-The app will be available at `http://localhost:5173`
+## Quality gates
 
-## Building
-
-### Web Build
 ```bash
-npm run build
-npm run preview
+make gate        # fast: only the areas that changed (web typecheck + tests, backend lint + types + tests)
+make gate-full   # everything CI runs, plus the web build
+make check       # what CI runs: backend lint, mypy, pytest (90% coverage), secret scan, audit, web
+make web-e2e-local   # Playwright against http://127.0.0.1:8000 (E2E_BASE_URL is required; there is no live-site default)
 ```
 
-### iOS Deployment
+Every API route must appear in `docs/openapi.yaml`; `backend/tests/test_contract_drift.py` fails otherwise.
 
-1. Build the web app:
-   ```bash
-   npm run build
-   ```
+## Builds
 
-2. Sync with Capacitor:
-   ```bash
-   npx cap sync ios
-   ```
+Android and iOS build, signing and provenance procedures live in `docs/release/`. Release builds never allow cleartext
+HTTP and never embed a developer AI key.
 
-3. Open in Xcode:
-   ```bash
-   npx cap open ios
-   ```
+## Working with Claude Code
 
-4. Select your iPhone device and click the Play button to build and deploy
-
-### Android Deployment
-
-1. Build the web app:
-   ```bash
-   npm run build
-   ```
-
-2. Sync with Capacitor:
-   ```bash
-   npx cap sync android
-   ```
-
-3. Open in Android Studio:
-   ```bash
-   npx cap open android
-   ```
-
-4. Select your emulator or device and click Run
-
-## Project Structure
-
-```
-journal/
-├── src/
-│   ├── components/     # React components
-│   ├── data/          # Seed data and meal database
-│   ├── db/            # SQLite database management
-│   ├── services/      # Authentication and biometric services
-│   ├── types/         # TypeScript type definitions
-│   └── utils/         # Utility functions
-├── ios/               # iOS native project
-├── android/           # Android native project
-├── public/            # Static assets
-└── server.ts          # Express server for local development
-```
-
-## Tech Stack
-
-- **Frontend:** React 19, TypeScript, Vite
-- **Styling:** Tailwind CSS
-- **Mobile:** Capacitor 8
-- **Database:** SQLite (via sql.js)
-- **Animations:** Motion UI
-- **Icons:** Lucide React
-
-## License
-
-MIT
+`CLAUDE.md` holds the rules; `docs/milestones.md` is the goal tracker; `scripts/agent/scope.json` names the active milestone
+and the paths it may change. Hooks in `.claude/settings.json` block edits outside that scope, secrets, dangerous commands
+and stopping with failing gates.

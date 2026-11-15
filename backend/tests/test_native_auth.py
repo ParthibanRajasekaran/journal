@@ -2,7 +2,7 @@
 
 The token is a locally signed test token, so this proves the nonce binding, the transaction and the
 bearer path. It does NOT prove Google's real tokens, which are pending the owner's OAuth clients.
-See docs/factory/proposals/native-auth/EVIDENCE.md."""
+See docs/native-sign-in.md."""
 
 import asyncio
 import uuid

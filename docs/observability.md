@@ -1,6 +1,6 @@
 # Observability plan (OpenTelemetry)
 
-Status: Draft · Date: 2026-10-29 · Related: ADR-001, ADR-002, ADR-006, `docs/design.md`
+Status: Draft · Date: 2026-10-29 · Related: ADR-001, ADR-002, ADR-006, `docs/spec/03-architecture-and-implementation.md`
 
 The aim is to see what the system is doing without ever writing user meal data, photos, or credentials into telemetry. Privacy rules come before convenience.
 
@@ -54,18 +54,12 @@ App (OTel SDK, OTLP gRPC/HTTP)
 - The `attributes` processor deletes known-sensitive keys even if application code is wrong. This is a second line of defence.
 - Collector listens only on the internal Docker network. It is not exposed through Caddy.
 
-## 4. Backend choice (to confirm in tooling assessment)
+## 4. Backend
 
-Options, all open source:
-
-| Option | Fit | Cost on one VPS | Notes |
-|---|---|---|---|
-| Jaeger (traces) + Prometheus (metrics) + Loki (logs) | Mature, separate parts | Moderate RAM | Several components to run |
-| SigNoz (single platform on ClickHouse) | One UI for all three signals | Higher RAM, ClickHouse | Verify licence of the parts you use |
-| Grafana stack (Tempo, Prometheus, Loki) | Strong dashboards | Moderate RAM | Check AGPL obligations before hosting |
-| No self-hosted backend in MVP; hosted OTLP endpoint | Least ops | Usage-priced | Conflicts with data-residency aim unless EU-hosted |
-
-Recommendation: start with the Collector writing to Prometheus and Loki (both mature, lighter to run), and add traces via Jaeger when needed. Decide after the tooling assessment confirms licences and RAM use on the chosen VPS.
+The self-hosted Prometheus, Loki, Jaeger and Grafana stack was removed from this repository in November 2026 to keep the
+repo to what the product needs. The API still emits OTLP when `JOURNAL_OTEL_ENDPOINT` is set and exports nothing otherwise
+(`backend/app/config.py`). A collector or hosted endpoint is an operations choice recorded in `docs/release/beta-backend.md`,
+not a repository concern.
 
 ## 5. What we alert on (MVP)
 
@@ -74,7 +68,6 @@ Recommendation: start with the Collector writing to Prometheus and Loki (both ma
 | API down | `/health` fails 3 times in 2 minutes | Restart container; check DB |
 | Estimate failures | Outcome `error` or `timeout` above 10% for 15 min, per provider | Switch provider in settings or check provider status |
 | Estimate drift | Nightly eval score below threshold (ADR-005) | Pause that adapter; investigate |
-| Policy denials spike | `deny` rate jumps 5× baseline | Check for abuse or a broken client |
 | Backup failed | Nightly backup job did not finish | Run manual backup; check storage |
 | Disk | Above 80% | Prune photos and logs |
 
@@ -86,6 +79,5 @@ Recommendation: start with the Collector writing to Prometheus and Loki (both ma
 
 ## 7. Open questions
 
-- Which backend (section 4).
 - Retention: proposed 14 days for traces, 30 days for logs, 90 days for aggregated metrics.
 - Whether to add client-side telemetry (crash reporting) in MVP. Proposed: crash reports only, no analytics, with consent.

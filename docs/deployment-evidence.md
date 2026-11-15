@@ -39,5 +39,5 @@ shell history was read. Owner-owned records (ADR-002, ADR-007) are not edited he
 
 1. ADR-002 describes a registry-based deploy that is not implemented. Either implement it, or amend ADR-002 to describe
    the manual build-on-server process.
-2. `docs/progress.md` previously said the instance was not yet created. Corrected in this change.
+2. The former progress log said the instance was not yet created. Corrected in this change; delivery status now lives in `docs/milestones.md`.
 3. Keep this note in step with the server by re-running the checks above when the deploy method changes.
