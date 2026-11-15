@@ -1,9 +1,10 @@
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.composesupport import compose_config_error
 
 pytestmark = pytest.mark.m0
 
@@ -50,17 +51,7 @@ def test_caddy_site_block_proxies_the_beta_api_only() -> None:
 
 
 def test_beta_compose_files_parse(tmp_path: Path) -> None:
-    docker = shutil.which("docker")
-    if docker is None:
-        pytest.fail("docker is required to check the compose file")
     # The real .env.beta never exists in the repository, so parse a copy beside a placeholder.
     shutil.copy(BETA_DIR / "compose.yaml", tmp_path / "compose.yaml")
     (tmp_path / ".env.beta").write_text("")
-    result = subprocess.run(  # noqa: S603 - fixed argv, no untrusted input
-        [docker, "compose", "-f", str(tmp_path / "compose.yaml"), "config", "--quiet"],
-        env={"POSTGRES_PASSWORD": "test", "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
+    assert compose_config_error(tmp_path / "compose.yaml") is None

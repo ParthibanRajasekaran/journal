@@ -2,13 +2,14 @@ import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
-// Release modes ship to phones and real users: the API must be reached over HTTPS.
-const RELEASE_MODES = ["beta", "production"];
-
+// Release builds must reach the API over HTTPS. `beta` is the phone build: it has no origin of its own, so the base must
+// be an https:// URL. Plain `vite build` is mode `production` and makes the web client the API serves, where an empty
+// base means same-origin; there only a non-HTTPS base is refused.
 export default defineConfig(({ mode }) => {
-  if (RELEASE_MODES.includes(mode)) {
+  if (mode === "beta" || mode === "production") {
     const apiBase = loadEnv(mode, process.cwd(), "VITE_").VITE_API_BASE ?? "";
-    if (!apiBase.startsWith("https://")) {
+    const sameOriginWeb = mode === "production" && apiBase === "";
+    if (!apiBase.startsWith("https://") && !sameOriginWeb) {
       throw new Error(
         `vite build --mode ${mode} needs VITE_API_BASE to start with https:// (got ${apiBase || "nothing"})`,
       );

@@ -40,9 +40,9 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
   provenance table (APK SHA-256, source SHA, `/version` output, date).
 
 ### Exit criteria
-- [ ] auto: `pytest -m m0` passes (version endpoint, production startup guards).
-- [ ] auto: `cd web && npx vite build --mode beta` with `VITE_API_BASE=http://x` fails; with `https://` it succeeds.
-- [ ] auto: `make gate-full` green.
+- [x] auto: `pytest -m m0` passes (version endpoint, production startup guards).
+- [x] auto: `cd web && npx vite build --mode beta` with `VITE_API_BASE=http://x` fails; with `https://` it succeeds.
+- [x] auto: `make gate-full` green.
 - [ ] manual: physical Android phone over mobile data with the Mac disconnected: Google sign-in, create, edit and reopen
   a meal, cold restart restores the session, logout, account switch to a disposable account sees nothing. APK SHA-256 and
   `/version` output recorded in `docs/release/android.md`.
@@ -58,6 +58,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | 2026-11-15 | 0429afb (tree dirty) | M0 task 5: beta stack proposal (`docker/beta/*`), `docs/release/beta-backend.md`, `ops/backup.sh` parameterised | mocked test | `backend/tests/test_beta_stack.py` (m0) checks isolation and `docker compose config` parsing. Not activated, no container started, restore never run, Caddy block not validated by Caddy |
 | 2026-11-15 | 43cc782 (tree dirty) | M0 task 6: `docs/release/google-oauth.md`; `VITE_GOOGLE_*` declared in `vite-env.d.ts` | mocked test | `make gate` passes. Documentation only; no OAuth client exists and no real token has been seen |
 | 2026-11-15 | d83ba56 (tree dirty) | M0 task 7: dated notes on ADR-001, 002, 004, 005, 007 (003 and 006 already done) | none (docs) | Notes checked against `meals.py`, `estimate.py`, `estimates.py`, `crypto.py`; statuses unchanged |
+| 2026-11-15 | df6d988 (tree dirty) | M0 exit criteria (auto) | mocked test + local build | `make gate-full` green (needed two fixes: bandit on the compose tests, and the Vite guard now allows an empty `VITE_API_BASE` in `--mode production` only, because plain `vite build` is that mode and makes the same-origin web client; `--mode beta` always needs `https://`). Checked by hand: beta with `http://x` or unset exits 1, `https://x` exits 0; production with `http://x` exits 1, unset and `https://x` exit 0 |
 | 2026-11-15 | 48e5a7e (tree dirty) | M0 task 8: `docs/release/android.md` (moved from `docs/mvp/`, rewritten, provenance table) | none (docs) | Procedure matches `build-android.sh`; its one provenance row is an uninstalled, dirty-tree APK |
 
 ### Parked
