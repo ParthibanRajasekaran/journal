@@ -1,0 +1,10 @@
+# PROPOSAL, NOT ACTIVATED. Puts the existing production Caddy on the beta_edge network so it can reach the beta api.
+# Used as an override when the owner activates beta, from the production stack's directory:
+#   docker compose -f compose.yaml -f beta/compose.caddy.yaml up -d caddy
+services:
+  caddy:
+    networks: [internal, beta_edge]
+
+networks:
+  beta_edge:
+    external: true

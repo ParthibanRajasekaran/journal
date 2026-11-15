@@ -1,0 +1,68 @@
+# PROPOSAL, NOT ACTIVATED. Isolated beta backend for the Android build (docs/release/beta-backend.md).
+# Its own project, database and volume: nothing here touches the production stack's data.
+# Secrets live in ./.env.beta, an owner-only file that is never committed.
+#   docker compose -f docker/beta/compose.yaml --env-file docker/beta/.env.beta up -d --build
+name: journal-beta
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: journal_beta
+      POSTGRES_USER: journal_beta
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata_beta:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U journal_beta -d journal_beta"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  # One-shot: applies migrations, then exits. The api starts only after it succeeds.
+  migrate:
+    build: &api-build
+      context: ../../backend
+      dockerfile: ../docker/Dockerfile.api
+      args:
+        JOURNAL_SOURCE_SHA: ${JOURNAL_SOURCE_SHA:-unknown}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    env_file: &api-env-file
+      - ./.env.beta
+    environment: &api-environment
+      JOURNAL_ENVIRONMENT: production
+      JOURNAL_PUBLIC_BASE_URL: https://beta.journal.getrendercheck.com
+      JOURNAL_DATABASE_URL: postgresql+asyncpg://journal_beta:${POSTGRES_PASSWORD}@postgres:5432/journal_beta
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  api:
+    build: *api-build
+    restart: unless-stopped
+    env_file: *api-env-file
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      internal: {}
+      # Shared with Caddy only. The production api and db are not on this network, so the name
+      # journal-beta-api cannot collide with the production api.
+      beta_edge:
+        aliases: [journal-beta-api]
+
+volumes:
+  pgdata_beta:
+
+networks:
+  internal: {}
+  # Created once by the owner: docker network create beta_edge
+  beta_edge:
+    external: true

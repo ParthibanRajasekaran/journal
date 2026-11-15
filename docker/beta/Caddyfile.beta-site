@@ -1,0 +1,24 @@
+# PROPOSAL, NOT ACTIVATED. Site block for the beta API. Append it to docker/Caddyfile when the owner activates the
+# beta stack (docs/release/beta-backend.md). It serves the API only: the Android app bundles its own web client.
+beta.journal.getrendercheck.com {
+	encode zstd gzip
+
+	request_body {
+		max_size 64KB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy journal-beta-api:8000
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}
