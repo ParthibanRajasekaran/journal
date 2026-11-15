@@ -92,6 +92,19 @@ class SuppliedAnswer(BaseModel):
 
 UNSURE = "unsure"
 
+# Keys a model reply must never carry. Ownership comes from the session, never from the model.
+IDENTITY_KEYS = frozenset({"owner_id", "user_id", "account_id", "sub", "email", "google_sub"})
+
+
+def _carries_identity_fields(value: object) -> bool:
+    if isinstance(value, dict):
+        return any(str(k).lower() in IDENTITY_KEYS for k in value) or any(
+            _carries_identity_fields(v) for v in value.values()
+        )
+    if isinstance(value, list):
+        return any(_carries_identity_fields(v) for v in value)
+    return False
+
 
 def _is_unsure(supplied: SuppliedAnswer) -> bool:
     return supplied.answer == UNSURE or supplied.answer not in supplied.options
@@ -107,7 +120,10 @@ def parse_reply(text: str, supplied: list[SuppliedAnswer] | None = None) -> Esti
     if start == -1 or end == -1:
         raise EstimateInvalid("The estimate could not be read. Try describing the meal again.")
     try:
-        reply = Reply.model_validate(json.loads(text[start : end + 1]))
+        raw = json.loads(text[start : end + 1])
+        if _carries_identity_fields(raw):
+            raise EstimateInvalid("The estimate could not be used. Try describing the meal again.")
+        reply = Reply.model_validate(raw)
     except (json.JSONDecodeError, ValidationError) as exc:
         raise EstimateInvalid(
             "The estimate was incomplete. Try describing the meal again."

@@ -41,28 +41,8 @@ def outcome(text: str) -> str:
     return "accept"
 
 
-def _outcome_cases() -> list[Any]:
-    cases: list[Any] = []
-    for row in load():
-        if row["id"] == "m18":
-            # Hidden identity fields are not yet refused by parse_reply (Phase 0 follow-up);
-            # strict xfail so the marker must be removed when the check lands.
-            cases.append(
-                pytest.param(
-                    row,
-                    id=row["id"],
-                    marks=pytest.mark.xfail(
-                        strict=True, reason="identity-field refusal pending in app/ai/estimate.py"
-                    ),
-                )
-            )
-        else:
-            cases.append(pytest.param(row, id=row["id"]))
-    return cases
-
-
 @pytest.mark.eval
-@pytest.mark.parametrize("row", _outcome_cases())
+@pytest.mark.parametrize("row", load(), ids=lambda r: str(r["id"]))
 def test_validator_outcome_matches_fixture(row: dict[str, Any]) -> None:
     assert outcome(reply_text(row)) == row["mock_expect"], row.get("expected", {}).get("note", "")
 

@@ -31,13 +31,16 @@ def main() -> None:
     section = milestone_section(name)
     branch = git("rev-parse", "--abbrev-ref", "HEAD").strip()
     status = git("status", "--short").splitlines()[:20]
+    tasks = [f"  {t}" for t in unchecked(section, "Tasks", 5)] or ["  (none unchecked)"]
+    criteria = [f"  {t}" for t in unchecked(section, "Exit criteria", 8)] or ["  (none)"]
+    title = milestone.get("title", "")
     lines = [
-        f"Journal agent brief. Branch {branch} at {head[:10]}. Active milestone: {name} ({milestone.get('title', '')}).",
+        f"Journal agent brief. Branch {branch} at {head[:10]}. Active milestone: {name} ({title}).",
         "Uncommitted: " + (", ".join(s.strip() for s in status) if status else "clean") + ".",
         "Next tasks:",
-        *[f"  {t}" for t in unchecked(section, "Tasks", 5)] or ["  (none unchecked)"],
+        *tasks,
         "Open exit criteria:",
-        *[f"  {t}" for t in unchecked(section, "Exit criteria", 8)] or ["  (none)"],
+        *criteria,
         "Rules: edit only paths in scripts/agent/scope.json for this milestone; run `make gate` before stopping; "
         "tick tasks and log evidence in docs/milestones.md; commit as 'M<n>: ...' on this branch; ask only for owner "
         "account, deployment, merge or spend decisions. Read CLAUDE.md and docs/milestones.md first.",
