@@ -16,7 +16,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 ### Tasks
 - [x] 1. `GET /api/v1/version` returning `{api_version, source_sha, migration_head, environment}`; `source_sha` from
   `JOURNAL_SOURCE_SHA` (build arg in `docker/Dockerfile.api`). Add to `docs/openapi.yaml`. Test `@pytest.mark.m0`.
-- [ ] 2. Migrations in deployment: compose one-shot `migrate` service (`alembic upgrade head`) that `api` depends on.
+- [x] 2. Migrations in deployment: compose one-shot `migrate` service (`alembic upgrade head`) that `api` depends on.
   `make migrate` exists already; test that the compose file parses with `docker compose config`.
 - [ ] 3. Release-configuration guards: `web/vite.config.ts` fails `--mode beta|production` when `VITE_API_BASE` is not
   `https://`; `web/scripts/build-android.sh <beta|emulator>` sets `VITE_API_BASE` and `VITE_BUILD_SHA`, refuses
@@ -52,6 +52,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | Date | Source SHA | Artifact | Kind | Result |
 |---|---|---|---|---|
 | 2026-11-15 | (this commit) | M0 task 1: `GET /api/v1/version` | mocked test | `backend/tests/test_version.py` (m0) and `make gate` pass; `/version` added to the public-route allowlist |
+| 2026-11-15 | (this commit) | M0 task 2: compose `migrate` one-shot, `api` depends on `service_completed_successfully` | mocked test | `backend/tests/test_compose.py` (m0) runs `docker compose config`; containers not started |
 
 ### Parked
 
