@@ -29,7 +29,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
   `beta.journal.getrendercheck.com` proxying to the beta API on a shared external network. `docs/release/beta-backend.md`:
   deploy, rollback (previous image; restore from backup rather than downgrade), backup/restore test with `ops/backup.sh`
   parameterised by database, DNS record, memory note about stopping the old observability stack.
-- [ ] 6. `docs/release/google-oauth.md`: owner checklist for the Android client (package `com.journal.nutrition`, debug
+- [x] 6. `docs/release/google-oauth.md`: owner checklist for the Android client (package `com.journal.nutrition`, debug
   keystore SHA-1), the web client id (token audience) and the iOS client id; declare `VITE_GOOGLE_WEB_CLIENT_ID` and
   `VITE_GOOGLE_IOS_CLIENT_ID` in `web/src/vite-env.d.ts`.
 - [ ] 7. ADR reconciliation (status and notes blocks only) per `docs/spec/03` "ADR reconciliation": ADR-001 natural keys
@@ -56,8 +56,14 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | 2026-11-15 | 9435ad4 (tree dirty) | M0 task 3: production Settings guards; `vite build --mode beta\|production` HTTPS guard; `web/scripts/build-android.sh` | mocked test + local build | `backend/tests/test_production_settings.py` (m0). `VITE_API_BASE=http://x` and unset fail, `https://x` builds. `build-android.sh beta` with JDK 21 built an unsigned debug APK, SHA-256 `b8a9e76b...2d7a`; not installed on any device |
 | 2026-11-15 | f3f0970 (tree dirty) | M0 task 4: Settings "About this build" (app `VITE_BUILD_SHA`, server `/version`) | mocked test | `web/src/screens/Settings.build-info.test.ts` and `make gate` pass; not seen on a device |
 | 2026-11-15 | 0429afb (tree dirty) | M0 task 5: beta stack proposal (`docker/beta/*`), `docs/release/beta-backend.md`, `ops/backup.sh` parameterised | mocked test | `backend/tests/test_beta_stack.py` (m0) checks isolation and `docker compose config` parsing. Not activated, no container started, restore never run, Caddy block not validated by Caddy |
+| 2026-11-15 | 43cc782 (tree dirty) | M0 task 6: `docs/release/google-oauth.md`; `VITE_GOOGLE_*` declared in `vite-env.d.ts` | mocked test | `make gate` passes. Documentation only; no OAuth client exists and no real token has been seen |
 
 ### Parked
+- `backend/app/auth/google.py` (outside M0 paths) verifies one audience (`JOURNAL_GOOGLE_CLIENT_ID`) and refuses any
+  token whose `azp` is present and different. Real Android tokens normally carry the Android client id in `azp`, and
+  `docs/native-sign-in.md` says iOS uses the iOS client id as audience, so real native sign-in may be refused. Unproven:
+  no real token has been decoded. Needs the verifier to accept the configured native client ids, with a test, once the
+  owner shares the first token's `aud` and `azp` (`docs/release/google-oauth.md`).
 
 ### Owner actions needed
 - Create Google OAuth clients (Android, web audience, iOS); provide a disposable second Google account.
