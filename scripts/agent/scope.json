@@ -1,0 +1,56 @@
+{
+  "active": "M0",
+  "always": [
+    "docs/milestones.md", "docs/release/**", "docs/evals/**", "docs/openapi.yaml",
+    "backend/tests/**", "web/src/**/*.test.ts", "web/src/**/*.test.tsx", "web/e2e/**",
+    "README.md", "CLAUDE.md"
+  ],
+  "never": [
+    "docs/spec/**", ".claude/**", "scripts/agent/**",
+    "src/**", "policy/**", "factory/**", "tools/**", "server.ts"
+  ],
+  "milestones": {
+    "M0": {
+      "title": "Mobile baseline",
+      "paths": [
+        "web/src/native/**", "web/src/App.tsx", "web/src/screens/SignIn.tsx", "web/src/screens/Settings.tsx",
+        "web/src/api.ts", "web/src/vite-env.d.ts", "web/capacitor.config.ts", "web/vite.config.ts", "web/index.html",
+        "web/android/**", "web/ios/**", "web/plugins/**", "web/scripts/**", "web/package.json", "web/package-lock.json",
+        "backend/app/main.py", "backend/app/config.py", "backend/app/routes/health.py", "backend/app/routes/auth.py",
+        "backend/app/routes/native_auth.py", "backend/app/routes/version.py", "backend/app/errors.py",
+        "backend/.env.example", "backend/pyproject.toml", "backend/uv.lock",
+        "docker/**", "ops/**", "docs/adr/**", "docs/deployment-evidence.md", "docs/native-sign-in.md",
+        "docs/mvp/**", "Makefile", ".github/**", ".gitignore"
+      ],
+      "rules": []
+    },
+    "M1": {
+      "title": "Everyday logging",
+      "paths": ["web/src/**", "web/index.html", "web/package.json", "web/package-lock.json", "web/vite.config.ts",
+                "backend/app/**", "backend/migrations/**", "backend/pyproject.toml", "backend/uv.lock"],
+      "rules": ["no-raw-localstorage"]
+    },
+    "M2": {
+      "title": "Camera estimates",
+      "paths": ["web/src/**", "web/package.json", "web/package-lock.json", "web/android/**", "web/ios/**", "web/capacitor.config.ts",
+                "backend/app/**", "backend/migrations/**", "backend/pyproject.toml", "backend/uv.lock", "backend/scripts/**",
+                "docker/**"],
+      "rules": ["no-raw-localstorage"]
+    },
+    "M3": {
+      "title": "Training and recovery",
+      "paths": ["web/src/**", "backend/app/**", "backend/migrations/**", "backend/data/**", "backend/pyproject.toml", "backend/uv.lock"],
+      "rules": ["no-raw-localstorage"]
+    },
+    "M4": {
+      "title": "Personal assistance",
+      "paths": ["web/src/**", "backend/app/**", "backend/migrations/**", "backend/data/**", "backend/pyproject.toml", "backend/uv.lock"],
+      "rules": ["no-raw-localstorage"]
+    },
+    "M5": {
+      "title": "Daily-use release and pilot",
+      "paths": ["web/**", "backend/**", "docker/**", "ops/**", "docs/**", "Makefile", ".github/**", ".gitignore"],
+      "rules": ["no-raw-localstorage"]
+    }
+  }
+}
