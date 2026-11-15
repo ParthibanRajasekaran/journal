@@ -28,6 +28,7 @@ PUBLIC_OPERATIONS = {
     ("/auth/native/logout", "post"),
     ("/health", "get"),
     ("/health/ready", "get"),
+    ("/version", "get"),
 }
 
 

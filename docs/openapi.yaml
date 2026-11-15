@@ -665,6 +665,36 @@ paths:
                     enum:
                     - ok
                 additionalProperties: false
+  /version:
+    get:
+      tags:
+      - Health
+      operationId: getVersion
+      security: []
+      summary: Build provenance
+      responses:
+        '200':
+          description: The source commit, API version and newest migration this build ships
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - api_version
+                - source_sha
+                - migration_head
+                - environment
+                properties:
+                  api_version:
+                    type: string
+                  source_sha:
+                    type: string
+                  migration_head:
+                    type: string
+                    nullable: true
+                  environment:
+                    type: string
+                additionalProperties: false
   /health/ready:
     get:
       tags:

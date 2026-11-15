@@ -20,6 +20,10 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 RUN uv sync --locked --no-dev
 
+# Reported by GET /api/v1/version. Pass --build-arg JOURNAL_SOURCE_SHA=$(git rev-parse HEAD).
+ARG JOURNAL_SOURCE_SHA=unknown
+ENV JOURNAL_SOURCE_SHA=$JOURNAL_SOURCE_SHA
+
 # Run as an unprivileged user.
 RUN useradd --create-home --uid 10001 app && chown -R app /app
 USER app

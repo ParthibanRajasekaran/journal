@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # OTLP/HTTP endpoint of the OpenTelemetry Collector on the internal network.
     # Unset means nothing is exported.
     otel_endpoint: str | None = None
+    # Git commit the image was built from (build arg in docker/Dockerfile.api), shown by /version.
+    source_sha: str = "unknown"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     problem_type_base: str = "https://journal.example/problems/"
     # Local development default. Production must set JOURNAL_DATABASE_URL explicitly.

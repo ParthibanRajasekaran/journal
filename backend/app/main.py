@@ -13,7 +13,7 @@ from app.config import Settings, get_settings
 from app.db.session import make_engine, make_session_factory
 from app.errors import install_problem_handlers
 from app.limits import WriteLimiter
-from app.routes import ai_keys, auth, days, estimates, health, me, meals, native_auth
+from app.routes import ai_keys, auth, days, estimates, health, me, meals, native_auth, version
 
 API_PREFIX = "/api/v1"
 
@@ -27,7 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     production = settings.environment == "production"
     app = FastAPI(
         title="Journal API",
-        version="1.0.0-draft",
+        version=version.API_VERSION,
         docs_url=None if production else "/api/docs",
         openapi_url=None if production else "/api/openapi.json",
         redoc_url=None,
@@ -45,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(health.router)
+    api.include_router(version.router)
     api.include_router(auth.router)
     api.include_router(me.router)
     api.include_router(meals.router)

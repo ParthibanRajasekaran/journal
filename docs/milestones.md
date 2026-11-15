@@ -14,7 +14,7 @@ Scope: native sign-in client, App boot and Settings, Capacitor and Android/iOS p
 factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release docs.
 
 ### Tasks
-- [ ] 1. `GET /api/v1/version` returning `{api_version, source_sha, migration_head, environment}`; `source_sha` from
+- [x] 1. `GET /api/v1/version` returning `{api_version, source_sha, migration_head, environment}`; `source_sha` from
   `JOURNAL_SOURCE_SHA` (build arg in `docker/Dockerfile.api`). Add to `docs/openapi.yaml`. Test `@pytest.mark.m0`.
 - [ ] 2. Migrations in deployment: compose one-shot `migrate` service (`alembic upgrade head`) that `api` depends on.
   `make migrate` exists already; test that the compose file parses with `docker compose config`.
@@ -51,6 +51,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 ### Evidence log
 | Date | Source SHA | Artifact | Kind | Result |
 |---|---|---|---|---|
+| 2026-11-15 | (this commit) | M0 task 1: `GET /api/v1/version` | mocked test | `backend/tests/test_version.py` (m0) and `make gate` pass; `/version` added to the public-route allowlist |
 
 ### Parked
 
