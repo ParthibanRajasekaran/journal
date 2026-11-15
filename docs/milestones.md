@@ -36,7 +36,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
   and versions, no replay cache or batch sync yet; ADR-002/007 manual build-on-server deploy, backup restore evidence;
   ADR-003 done in Phase 0; ADR-004 actual native flow, real-device evidence as release gate; ADR-005 chat-completions
   text-only, static key encryption, explicit preference pending M1; ADR-006 done in Phase 0.
-- [ ] 8. Move `docs/mvp/android-beta-setup.md` to `docs/release/android.md`, rewritten with the current procedure and a
+- [x] 8. Move `docs/mvp/android-beta-setup.md` to `docs/release/android.md`, rewritten with the current procedure and a
   provenance table (APK SHA-256, source SHA, `/version` output, date).
 
 ### Exit criteria
@@ -58,6 +58,7 @@ factory, config, health/auth/native-auth routes, Docker and ops, ADRs, release d
 | 2026-11-15 | 0429afb (tree dirty) | M0 task 5: beta stack proposal (`docker/beta/*`), `docs/release/beta-backend.md`, `ops/backup.sh` parameterised | mocked test | `backend/tests/test_beta_stack.py` (m0) checks isolation and `docker compose config` parsing. Not activated, no container started, restore never run, Caddy block not validated by Caddy |
 | 2026-11-15 | 43cc782 (tree dirty) | M0 task 6: `docs/release/google-oauth.md`; `VITE_GOOGLE_*` declared in `vite-env.d.ts` | mocked test | `make gate` passes. Documentation only; no OAuth client exists and no real token has been seen |
 | 2026-11-15 | d83ba56 (tree dirty) | M0 task 7: dated notes on ADR-001, 002, 004, 005, 007 (003 and 006 already done) | none (docs) | Notes checked against `meals.py`, `estimate.py`, `estimates.py`, `crypto.py`; statuses unchanged |
+| 2026-11-15 | 48e5a7e (tree dirty) | M0 task 8: `docs/release/android.md` (moved from `docs/mvp/`, rewritten, provenance table) | none (docs) | Procedure matches `build-android.sh`; its one provenance row is an uninstalled, dirty-tree APK |
 
 ### Parked
 - `backend/app/auth/google.py` (outside M0 paths) verifies one audience (`JOURNAL_GOOGLE_CLIENT_ID`) and refuses any
